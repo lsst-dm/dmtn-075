@@ -4,6 +4,7 @@
 % lsstdoc documentation: https://lsst-texmf.lsst.io/lsstdoc.html
 
 % Package imports go here.
+\usepackage{bm}
 
 % Local commands go here.
 
@@ -43,7 +44,64 @@ Design sketch and mathematics for a new approach to building coadds and constrai
 % Table of contents is added automatically with the "toc" class option.
 \maketitle
 
-% ADD CONTENT HERE
+\section{Mathematics}
+
+All quantities are defined within a single cell, which is a rectangle with integer-pixel boundaries in the coordinate systen.
+We assume that cells are sufficiently small that all PSFs, coordinate transforms, and backgrounds can be considered constant over any \emph{two} adjacent cells.
+
+Definitions:
+
+\begin{itemize}
+\item $\bm{\mu}$: position in coadd coordinates.
+\item $\lambda$: wavelength.
+\item $\alpha(\lambda, \mu)$: true above-the-atmosphere scene, as a function of wavelength and position, not including backgrounds.
+\item $\beta(\lambda)$: sky and other backgrounds in input image $i$.
+\item $\bm{A}_i$: affine transform that maps positions on input image $i$ to coadd coordinates.
+\item $\phi_i(\lambda, \bm{x})$: PSF that maps true-sky flux to observed flux in input image $i$ a distance $\bm{x}$ (in input image pixel coordinates) away, all at wavelength $\lambda$.
+Constrained such that
+$\int \phi_i(\lambda, \bm{x}) d\lambda = 1$ for all $\bm{x}$ and
+$\int \phi_i(\lambda, \bm{x}) d^2\bm{x} = 1$ for all $\lambda$.
+\item $\tau_i(\lambda)$: Photometric transmission that maps true-sky flux to observed flux in input image $i$.
+\item $z_{i,j}$: the value of pixel $j$ in input image $i$, includes backgrounds.
+\item $\bm{r}_{i,j}$: the position of pixel $j$ on input image $i$, in that image's pixel coordinate system.
+\item $\sigma_{i,j}$: RMS uncertainty of pixel $j$ on inputimage $i$.  Assumed Gaussian and uncorrelated with neighboring pixels.
+\item $N$: the number of input images.
+\item $M_i$: the number of pixels in input image $j$.
+\end{itemize}
+
+The log-likelihood for all input images is:
+\begin{align}
+L \equiv &
+    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{j=0}^{j<M_i}
+        \frac{1}{\sigma_{i,j}^2}
+        \left[
+            z_{i,j}
+            - \int\!\!\!\!\int\!
+                \tau_i(\lambda)
+                \, \phi_i(\lambda, \bm{r}_{i,j} - \bm{x})
+                \left[
+                    \alpha(\lambda, \bm{A}_i\bm{x})
+                    + \beta_i(\lambda)
+                \right]
+                \, d\lambda \, d^2\bm{x}
+        \right]^2 \\
+=&
+    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{j=0}^{j<M_i}
+        \frac{1}{\sigma_{i,j}^2}
+        \left[
+            z_{i,j}
+            - \int\!\!\!\!\int\!
+                \tau_i(\lambda)
+                \, \phi_i(\lambda, \bm{r}_{i,j} - \bm{x})
+                \, \alpha(\lambda, \bm{A}_i\bm{x})
+                \, d\lambda \, d^2\bm{x}
+            - \int\!
+                \tau_i(\lambda)\,
+                \beta_i(\lambda)
+                \, d\lambda
+        \right]^2 \\
+\end{align}
+
 
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies
