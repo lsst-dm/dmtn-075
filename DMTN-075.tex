@@ -52,56 +52,80 @@ We assume that cells are sufficiently small that all PSFs, coordinate transforms
 Definitions:
 
 \begin{itemize}
-\item $\bm{\mu}$: position in coadd coordinates.
-\item $\lambda$: wavelength.
-\item $\alpha(\lambda, \mu)$: true above-the-atmosphere scene, as a function of wavelength and position, not including backgrounds.
-\item $\beta(\lambda)$: sky and other backgrounds in input image $i$.
-\item $\bm{A}_i$: affine transform that maps positions on input image $i$ to coadd coordinates.
-\item $\phi_i(\lambda, \bm{x})$: PSF that maps true-sky flux to observed flux in input image $i$ a distance $\bm{x}$ (in input image pixel coordinates) away, all at wavelength $\lambda$.
-Constrained such that
-$\int \phi_i(\lambda, \bm{x}) d\lambda = 1$ for all $\bm{x}$ and
-$\int \phi_i(\lambda, \bm{x}) d^2\bm{x} = 1$ for all $\lambda$.
-\item $\tau_i(\lambda)$: Photometric transmission that maps true-sky flux to observed flux in input image $i$.
-\item $z_{i,j}$: the value of pixel $j$ in input image $i$, includes backgrounds.
-\item $\bm{r}_{i,j}$: the position of pixel $j$ on input image $i$, in that image's pixel coordinate system.
-\item $\sigma_{i,j}$: RMS uncertainty of pixel $j$ on inputimage $i$.  Assumed Gaussian and uncorrelated with neighboring pixels.
+\item $\bm{\mu}$, $\bm{\nu}$: vector positions in coadd coordinates (each of $\bm{\mu}$ and $\bm{\nu}$ is a tuple of two coordinates)
+\item $\lambda$: an \emph{index} over wavelength bins
+\item $\alpha_{\lambda}(\bm{\mu})$: true above-the-atmosphere scene in coadd coordinates, integrated over wavelength bin $\lambda$, not including backgrounds.
+\item $\beta_{i,\lambda}$: sky and other backgrounds in input image $i$ and wavelength bin $\lambda$
+\item $\bm{A}_i$: affine mapping from input image $i$ coordinates $\bm{x}_i$to coadd coordinates.
+\item $\bm{x}_{i}$, $\bm{y}_i$: positions in the coordinate system of input image $i$ (each of $\bm{x}$ and $\bm{y}$ is a tuple of two coordinates).
+\item $\phi_{i,\lambda}(\bm{x})$: PSF that maps true-sky flux to observed flux in input image $i$ a distance $\bm{x}$ away (in input image pixel coordinates), integrated over wavelength bin $\lambda$.  Constrained such that
+$\int \phi_{i,\lambda}(\bm{x}) d^2\bm{x} = 1$ for all $\lambda$.
+\item $\tau_{i,\lambda}$: Photometric transmission that maps true-sky flux to observed flux in input image $i$, integrated over wavelength bin $\lambda$
+\item $z_{i}[\bm{x}]$: the value of the pixel at $\bm{x}$ in input image $i$, including backgrounds.
+\item $\sigma_{i,j}$: RMS uncertainty of pixel $j$ on input image $i$.  Assumed Gaussian and uncorrelated with neighboring pixels.
 \item $N$: the number of input images.
-\item $M_i$: the number of pixels in input image $j$.
+\item $\bm{E}_i$: the set of all pixel indices in input image $i$.
+\item $W$: the number of wavelength bins.
 \end{itemize}
 
 The log-likelihood for all input images is:
 \begin{align}
 L \equiv &
-    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{j=0}^{j<M_i}
-        \frac{1}{\sigma_{i,j}^2}
+    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{\bm{x} \in \bm{E}_i}
+        \frac{1}{\sigma_{i}^2[\bm{x}_i]}
         \left[
-            z_{i,j}
-            - \int\!\!\!\!\int\!
-                \tau_i(\lambda)
-                \, \phi_i(\lambda, \bm{r}_{i,j} - \bm{x})
-                \left[
-                    \alpha(\lambda, \bm{A}_i\bm{x})
-                    + \beta_i(\lambda)
-                \right]
-                \, d\lambda \, d^2\bm{x}
+            z_{i}[\bm{x}_i]
+            - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
+            - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
+                \int\!
+                \, \phi_{i,\lambda}(\bm{x}_i - \bm{y}_i)
+                \, \alpha_{\lambda}(\bm{A}_i\bm{y}_i)
+                \, d^2\bm{y}_i
         \right]^2 \\
-=&
-    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{j=0}^{j<M_i}
-        \frac{1}{\sigma_{i,j}^2}
+    = &
+    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{\bm{x} \in \bm{E}_i}
+        \frac{1}{\sigma_{i}^2[\bm{x}_i]}
         \left[
-            z_{i,j}
-            - \int\!\!\!\!\int\!
-                \tau_i(\lambda)
-                \, \phi_i(\lambda, \bm{r}_{i,j} - \bm{x})
-                \, \alpha(\lambda, \bm{A}_i\bm{x})
-                \, d\lambda \, d^2\bm{x}
-            - \int\!
-                \tau_i(\lambda)\,
-                \beta_i(\lambda)
-                \, d\lambda
-        \right]^2 \\
+            z_{i}[\bm{x}_i]
+            - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
+            - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
+                \int\!
+                \, \phi_{i,\lambda}(
+                    \bm{A}_i^{-1}[\bm{A}_i\bm{x}_i - \bm{\mu}]
+                )
+                \, \alpha_{\lambda}(\bm{\mu})
+                \, \frac{d^2\bm{\mu}}{|A_i|}
+        \right]^2
 \end{align}
 
+Regardless of whether the PSF of any particular image is well-sampled on that image's own grid, we can define the coadd coordinate system such that all input PSFs are well-sampled on its grid.
+This means we can exactly represent the PSF of an input image as a sinc-weighted sum over discrete evaluations:
+\begin{align}
+    \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\mu})
+    = &
+     \sum_{\bm{\nu} \in \bm{P}}
+        \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\nu})
+        \, \mathrm{sinc}(\pi[\bm{\mu}-\bm{\nu}])
+\end{align}
+Note that this is a 2-d sum over a 2-d sinc function.
+The limits $\bm{P}$ enclose the region where the transformed PSF is nonzero.
+Plugging this into the likelihood and rearranging,
+\begin{align}
+L = &
+    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{\bm{x} \in \bm{E}_i}
+        \frac{1}{\sigma_{i}^2[\bm{x}_i]}
+        \left[
+            z_{i}[\bm{x}_i]
+            - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
+            - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
+                \sum_{\bm{\nu} \in \bm{P}}
+                    \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\nu})
+                \int\!
+                    \, \mathrm{sinc}(\pi[\bm{A}_i\bm{x}_i-\bm{\mu}-\bm{\nu}])
+                \, \alpha_{\lambda}(\bm{\mu})
+                \, \frac{d^2\bm{\mu}}{|A_i|}
+        \right]^2
+\end{align}
 
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies
