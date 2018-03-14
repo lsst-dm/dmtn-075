@@ -6,6 +6,7 @@
 \usepackage{color}
 
 % Local commands go here.
+
 \newcommand{\todo}[1]{{\color{red}[#1]}}
 
 % To add a short-form title:
@@ -44,14 +45,12 @@ Design sketch and mathematics for a new approach to building coadds and constrai
 % Table of contents is added automatically with the "toc" class option.
 \maketitle
 
-\section{Optimal Coadds}
+\section{Likelihood Coadds}
 
 All quantities are defined within a single cell, which is a rectangle with integer-pixel boundaries in the coadd coordinate systen.
 Input-image quantities in cells enclose a larger area: they include any pixel that could contribute to that cell on the coadd.
 This means that some input-image pixels contribute to multiple cells.
 We assume that cells are sufficiently small that all PSFs, coordinate transforms, and backgrounds can be considered constant over any \emph{two} adjacent cells.
-
-\subsection{Well-Sampled Data}
 
 Definitions:
 \begin{itemize}
@@ -59,74 +58,52 @@ Definitions:
 \item $\lambda$: an \emph{index} over wavelength bins
 \item $\bm{A}_i$: affine mapping from input image $i$ coordinates $\bm{x}_i$to coadd coordinates.
 \item $\bm{x}_{i}$, $\bm{y}_i$: positions in the coordinate system of input image $i$ (each of $\bm{x}$ and $\bm{y}$ is a tuple of two coordinates).
-\item $z_{i}[\bm{x}_i]$: the value of the pixel at $\bm{x}_i$ in input image $i$, including backgrounds.
+\item $z_{i}[\bm{x}_i]$: the value of the pixel at $\bm{x}_i$ in input image $i$, after background subtraction.
 \item $\phi_{i,\lambda}(\bm{x}-\bm{y})$: PSF that maps true-sky flux at $\bm{x}$ to observed flux in input image $i$ at $\Delta\bm{y}$, integrated over wavelength bin $\lambda$.  Constrained such that
 $\int \phi_{i,\lambda}(\bm{x}) d^2\bm{x} = 1$ for all $\lambda$.
 \item $\tau_{i,\lambda}$: Photometric transmission that maps true-sky flux to observed flux in input image $i$, integrated over wavelength bin $\lambda$
 \item $C_{i}[\bm{x}_i, \bm{y}_i]$: noise covariance between pixels $\bm{x}_i$ and $\bm{y}_i$ on input image $i$.  Assumed Gaussian and uncorrelated with neighboring pixels.
 \item $N$: the number of input images.
 \item $W$: the number of wavelength bins.
-\item $\bm{E}_i$: the set of all pixel indices in input image $i$ that contribute to the current cell.
-\item $\bm{F}$: the set of all coadd pixel indices in the cell.
+\item $\bm{E}_i$: the set of all pixel indices in input image $i$ that contribute to the current cell.  $|E_i|$ is used to denote the total number of pixels from that image that contribute to the cell.
+\item $\bm{F}$: the set of all coadd pixel indices in the cell.  $|F|$ is used to denote the total number of pixels in the cell.
 \item $\alpha_{\lambda}(\bm{\mu})$: true above-the-atmosphere scene in coadd coordinates, integrated over wavelength bin $\lambda$, not including backgrounds.
-\item $\beta_{i,\lambda}$: sky and other backgrounds in input image $i$ and wavelength bin $\lambda$.
 \end{itemize}
 
-We begin by using sinc interpolation to resample each input image to the input coordinate system:
-\begin{align}
-    \hat{z}_{i}[\bm{\mu}] =
-        \sum_{\bm{x}_i \in \bm{E}_i}
-            \mathrm{sinc}(\pi(\bm{A}_i^{-1}\bm{\mu} - \bm{x}_i))
-            \, z_{i}[\bm{x}_i]
-\end{align}
-with uncertainty
-\begin{align}
-    \hat{C}_{i}[\bm{\mu}, \bm{\nu}] =
-        \sum_{\bm{x}_i \in \bm{E}_i}
-            \mathrm{sinc}(\pi(\bm{A}_i^{-1}\bm{\mu} - \bm{x}_i))
-            \,\mathrm{sinc}(\pi(\bm{A}_i^{-1}\bm{\nu} - \bm{y}_i))
-            \, C_{i}[\bm{x}_i, \bm{y}_i]
-\end{align}
-and PSF
-\begin{align}
-    \hat{\phi}_{i,\lambda}(\bm{\mu}-\bm{\nu}) =
-        \frac{1}{|A_i|}
-        \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\mu} - \bm{A}_i^{-1}\bm{\nu})
-\end{align}
-The photometric calibration $\tau_{i,\lambda}$ and background $\beta_{i,\lambda}$ are unchanged under this transformation \todo{check this!}.
-
-The joint log-likelihood for all input images is then:
+The joint log-likelihood for all input images is:
 \begin{align}
 L \equiv &
-    \frac{1}{2} \sum_{i=0}^{N}
-        \sum_{\bm{\mu} \in \bm{F}}
-        \sum_{\bm{\nu} \in \bm{F}}
-        \left[
-        \hat{C}_i^{-1}[\bm{\mu}, \bm{\nu}]
-        \right.
-        \\
+    \frac{1}{2} \sum_{i=0}^{i<N}
+        \sum_{\bm{x}_i \in \bm{E}_i}
+        \sum_{\bm{y}_i \in \bm{E}_i}
+        \Bigg[
+        \,C_i^{-1}[\bm{x}_i, \bm{y}_i]
+        \Bigg.
+        \nonumber\\
     & \quad \times
         \left(
-            \hat{z}_i[\bm{\mu}]
-            - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
-            - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
+            z_i[\bm{x}_i]
+            - \sum_{\lambda_1=0}^{\lambda_1 < W} \tau_{i,\lambda_1}
                 \int\!
-                \, \hat{\phi}_{i,\lambda}(\bm{\mu} - \bm{\eta})
-                \, \alpha_{\lambda}(\bm{\eta})
-                \, d^2\bm{\eta}
-        \right) \\
+                \phi_{i,\lambda_1}\!\left(
+                    \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+                \right)
+                \; \alpha_{\lambda_1}(\bm{\mu})
+                \; d^2\bm{\mu}
+        \right) \nonumber\\
     & \quad \times
-    \left.
+    \Bigg.
         \left(
-            \hat{z}_i[\bm{\nu}]
-            - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
-            - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
+            z_i[\bm{y}_i]
+            - \sum_{\lambda_2=0}^{\lambda_2 < W} \tau_{i,\lambda_2}
                 \int\!
-                \, \hat{\phi}_{i,\lambda}(\bm{\nu} - \bm{\zeta})
-                \, \alpha_{\lambda}(\bm{\zeta})
-                \, d^2\bm{\zeta}
+                \phi_{i,\lambda_2}\!\left(
+                    \bm{y}_i - \bm{A}_i^{-1}(\bm{\nu})
+                \right)
+                \; \alpha_{\lambda_2}(\bm{\nu})
+                \; d^2\bm{\nu}
         \right)
-    \right]
+    \Bigg]
 \end{align}
 
 While the true sky contains power at arbitrarily small spatial scales, the PSFs do not; we can always choose the coadd coordinate system such that all
@@ -134,25 +111,368 @@ input PSFs are well-sampled on that grid.
 We can thus exactly represent the continuous PSF as a sinc interpolation of
 discrete samples from it:
 \begin{align}
-    \hat{\phi}_{i,\lambda}(\bm{\mu}-\bm{\eta}) =
-    \sum_{\bm{\gamma} \in \bm{P}}
-        \mathrm{sinc}(\pi(\bm{\eta}-\bm{\gamma}))
-        \,\hat{\phi}_{i,\lambda}[\bm{\mu}-\bm{\gamma}]
+    \phi_{i,\lambda}(\bm{x}_i-A_i^{-1}\bm{\mu}) =
+    \sum_{\bm{\eta} \in \bm{F}}
+        \mathrm{sinc}\big(\pi(\bm{\mu}-\bm{\eta})\big)
+        \;\phi_{i,\lambda}\!\left(
+            \bm{x}_i - \bm{A}_i^{-1}(\bm{\eta})
+        \right)
 \end{align}
 We can then insert this into the convolution integral,
 \begin{align}
     \int\!
-        \, \hat{\phi}_{i,\lambda}(\bm{\mu}-\bm{\eta})
-        \, \alpha_{\lambda}(\bm{\eta})
-        \, d^2\bm{\eta}
+        \, \phi_{i,\lambda}\!\left(\bm{x}_i-\bm{A}_i^{-1}(\bm{\mu})\right)
+        \, \alpha_{\lambda}(\bm{\mu})
+        \, d^2\bm{\mu}
     = &
-    \sum_{\bm{\gamma} \in \bm{P}}
-        \,\hat{\phi}_{i,\lambda}[\bm{\mu}-\bm{\gamma}]
-        \int\!
-        \mathrm{sinc}(\pi(\bm{\eta}-\bm{\gamma}))
-        \, \alpha_{\lambda}(\bm{\eta})
-        \, d^2\bm{\eta}
+    \sum_{\bm{\eta} \in \bm{F}}
+        \;\phi_{i,\lambda}\!\left(
+            \bm{x}_i - \bm{A}_i^{-1}(\bm{\eta})
+        \right)
+        \!\int\!
+        \mathrm{sinc}\big(\pi(\bm{\mu}-\bm{\eta})\big)
+        \; \alpha_{\lambda}(\bm{\mu})
+        \; d^2\bm{\mu} \\
+    = &
+    \sum_{\bm{\eta} \in \bm{F}}
+        \;\phi_{i,\lambda}\!\left(
+            \bm{x}_i - \bm{A}_i^{-1}(\bm{\eta})
+        \right)
+        \, f_{\lambda}(\bm{\eta})
 \end{align}
+with the sinc-convolved true scene $f_{\lambda}$ defined as
+\begin{align}
+    f_{\lambda}(\bm{\eta}) \equiv \int\!
+        \mathrm{sinc}\big(\pi(\bm{\mu}-\bm{\eta})\big)
+        \; \alpha_{\lambda}(\bm{\mu})
+        \; d^2\bm{\mu} \\
+\end{align}
+Thus, $f_{\lambda}$ is essentially a band-limited version of $\alpha_{\lambda}$, restricted to just the spatial frequencies we can constrain from the input data (via our requirement that the coadd coordinate grid fully sample all input PSFs).
+We therefore consider any sufficient statistic for $f_{\lambda}$ to also be a sufficient statistic for $\alpha_{\lambda}$.
+
+We can now substitute this into the joint likelihood:
+\begin{align}
+L = &
+    \frac{1}{2} \sum_{i=0}^{i<N}
+        \sum_{\bm{x}_i \in \bm{E}_i}
+        \sum_{\bm{y}_i \in \bm{E}_i}
+        \Bigg[
+        \,C_i^{-1}[\bm{x}_i, \bm{y}_i]
+        \Bigg.
+        \nonumber\\
+    & \qquad \times
+        \left(
+            z_i[\bm{x}_i]
+            - \sum_{\lambda_1=0}^{\lambda_1 < W} \tau_{i,\lambda_1}
+                \sum_{\bm{\eta} \in \bm{F}}
+                        \;\phi_{i,\lambda_1}\!\left(
+                            \bm{x}_i - \bm{A}_i^{-1}(\bm{\eta})
+                        \right)
+                        \, f_{\lambda_1}(\bm{\eta})
+        \right) \nonumber\\
+    & \qquad \times
+    \Bigg.
+        \left(
+            z_i[\bm{y}_i]
+            - \sum_{\lambda_2=0}^{\lambda_2 < W} \tau_{i,\lambda_2}
+                \sum_{\bm{\zeta} \in \bm{F}}
+                        \;\phi_{i,\lambda_2}\!\left(
+                            \bm{y}_i - \bm{A}_i^{-1}(\bm{\zeta})
+                        \right)
+                        \, f_{\lambda_2}(\bm{\zeta})
+        \right)
+    \Bigg]
+\end{align}
+expand the terms:
+\begin{align}
+L =&
+    \frac{1}{2} \sum_{i=0}^{i<N}
+        \sum_{\bm{x}_i \in \bm{E}_i}
+        \sum_{\bm{y}_i \in \bm{E}_i}
+        C_i^{-1}[\bm{x}_i, \bm{y}_i]
+        \;z_i[\bm{x}_i]
+        \;z_i[\bm{y}_i]
+    \nonumber\\
+&\; +
+    \frac{1}{2} \sum_{i=0}^{i<N}
+        \sum_{\bm{x}_i \in \bm{E}_i}
+        \sum_{\bm{y}_i \in \bm{E}_i}
+        \Bigg[
+        \,C_i^{-1}[\bm{x}_i, \bm{y}_i]
+        \left(
+            \sum_{\lambda_1=0}^{\lambda_1 < W} \tau_{i,\lambda_1}
+                \sum_{\bm{\eta} \in \bm{F}}
+                        \;\phi_{i,\lambda_1}\!\left(
+                            \bm{x}_i - \bm{A}_i^{-1}(\bm{\eta})
+                        \right)
+                        \, f_{\lambda_1}(\bm{\eta})
+        \right)
+        \Bigg.
+    \nonumber\\
+&\qquad\qquad\qquad\qquad\qquad \times
+        \Bigg.
+        \left(
+            \sum_{\lambda_2=0}^{\lambda_2 < W} \tau_{i,\lambda_2}
+                \sum_{\bm{\zeta} \in \bm{F}}
+                        \;\phi_{i,\lambda_2}\!\left(
+                            \bm{y}_i - \bm{A}_i^{-1}(\bm{\zeta})
+                        \right)
+                        \, f_{\lambda_2}(\bm{\zeta})
+        \right)
+        \Bigg]
+    \nonumber\\
+&\; -
+    \sum_{i=0}^{i<N}
+        \sum_{\bm{x}_i \in \bm{E}_i}
+        \sum_{\bm{y}_i \in \bm{E}_i}
+        C_i^{-1}[\bm{x}_i, \bm{y}_i]
+        \; z_i[\bm{x}_i]
+        \left(
+            \sum_{\lambda_2=0}^{\lambda_2 < W} \tau_{i,\lambda_2}
+                \sum_{\bm{\eta} \in \bm{F}}
+                        \;\phi_{i,\lambda_2}\!\left(
+                            \bm{y}_i - \bm{A}_i^{-1}(\bm{\zeta})
+                        \right)
+                        \, f_{\lambda_2}(\bm{\zeta})
+        \right)
+\end{align}
+and reorder the sums (consolidating some for brevity):
+\begin{align}
+L =&
+    \frac{1}{2}
+        \Bigg[
+            \sum_{i}
+            \sum_{\bm{x}_i,\bm{y}_i}
+                C_i^{-1}[\bm{x}_i, \bm{y}_i]
+                \;z_i[\bm{x}_i]
+                \;z_i[\bm{y}_i]
+        \Bigg]
+    \nonumber\\
+&\; +
+    \frac{1}{2}
+        \sum_{\lambda_1,\lambda_2}
+        \sum_{\bm{\mu},\bm{\nu}}
+        f_{\lambda_1}(\bm{\mu}) \;
+        f_{\lambda_2}(\bm{\nu}) \;
+        \Bigg[
+        \sum_{i}
+            \tau_{i,\lambda_1}
+            \tau_{i,\lambda_2}
+        \Bigg.
+    \nonumber\\
+&\qquad\qquad\qquad\qquad \times
+        \Bigg.
+            \sum_{\bm{x}_i,\bm{y}_i}
+            \,C_i^{-1}[\bm{x}_i, \bm{y}_i]
+            \; \phi_{i,\lambda_1}\!\left(
+                    \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+            \right)
+            \; \phi_{i,\lambda_2}\!\left(
+                \bm{y}_i - \bm{A}_i^{-1}(\bm{\nu})
+            \right)
+        \Bigg]
+    \nonumber\\
+&\; -
+    \sum_{\lambda}
+    \sum_{\bm{\mu}}
+    f_{\lambda}(\bm{\mu})
+    \left[
+        \sum_{i}
+        \tau_{i,\lambda}
+        \sum_{\bm{x}_i,\bm{y}_i}
+            C_i^{-1}[\bm{x}_i, \bm{y}_i]
+            \; z_i[\bm{x}_i]
+            \; \phi_{i,\lambda}\!\left(
+                \bm{y}_i - \bm{A}_i^{-1}(\bm{\mu})
+            \right)
+    \right]
+\end{align}
+
+The three terms in square brackets include all sums over images, and together constitute a sufficient statistic for $f_\lambda$.
+Defining them as
+\begin{align}
+    \kappa \equiv &
+        \sum_{i}
+            \sum_{\bm{x}_i,\bm{y}_i}
+                C_i^{-1}[\bm{x}_i, \bm{y}_i]
+                \;z_i[\bm{x}_i]
+                \;z_i[\bm{y}_i]
+        \equiv \sum_{i} \kappa_i
+    \\
+    \Psi_{\lambda}[\bm{\mu}] \equiv &
+        \sum_{i}
+        \tau_{i,\lambda}
+        \sum_{\bm{x}_i,\bm{y}_i}
+            C_i^{-1}[\bm{x}_i, \bm{y}_i]
+            \; z_i[\bm{x}_i]
+            \; \phi_{i,\lambda}\!\left(
+                \bm{y}_i - \bm{A}_i^{-1}(\bm{\mu})
+            \right)
+        \equiv \sum_{i} \Psi_{i,\lambda}[\bm{\mu}]
+    \\
+    \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}] \equiv &
+        \sum_{i}
+            \tau_{i,\lambda_1}
+            \tau_{i,\lambda_2}
+        \sum_{\bm{x}_i,\bm{y}_i}
+            \,C_i^{-1}[\bm{x}_i, \bm{y}_i]
+            \; \phi_{i,\lambda_1}\!\left(
+                    \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+            \right)
+            \; \phi_{i,\lambda_2}\!\left(
+                \bm{y}_i - \bm{A}_i^{-1}(\bm{\nu})
+            \right)
+    \nonumber\\
+    \equiv & \sum_{i} \Phi_{i,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+\end{align}
+we can rewrite the likelihood as
+\begin{align}
+L =&
+    \frac{\kappa}{2}
++
+    \frac{1}{2}
+    \sum_{\lambda_1,\lambda_2}
+    \sum_{\bm{\mu},\bm{\nu}}
+    f_{\lambda_1}(\bm{\mu}) \;
+    f_{\lambda_2}(\bm{\nu}) \;
+    \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+-
+    \sum_{\lambda}
+    \sum_{\bm{\mu}}
+    f_{\lambda}(\bm{\mu})
+    \;\Psi_{\lambda}[\bm{\mu}]
+\end{align}
+
+Together these already constitutes a coadd of sorts (and a lossless one), but this representation is difficult to use and not at all compact; while $\kappa$ is a scalar and $\Psi[\bm{\mu}]$ is an image (recall that $\bm{\mu}$ is a vector index) for each wavelength bin (a total of $W\times|F|$ elements), $\Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ has $W^2 \times |F|^2$ elements.
+For any realistic number of input epochs and practical cell sizes, that will be more than the total number of input data points.
+This indicates that this representation contains significant redundant information, but before tackling the problem of how to compress it we will first address the question of what makes a coadd ``easy to use''.
+Our definition is that such a coadd's likelihood should have a form similar to that of an individual image:
+\begin{align}
+\hat{L} =&
+    \frac{1}{2}\sum_{\bm{\eta},\bm{\zeta}}
+    \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+    \bigg(
+        \hat{z}_{\lambda_1}[\bm{\eta}]
+        - \sum_{\bm{\mu}}\hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \; f_{\lambda_1}[\bm{\mu}]
+    \bigg)
+    \bigg(
+        \hat{z}_{\lambda_2}[\bm{\zeta}]
+        - \sum_{\bm{\nu}}\hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+        \; f_{\lambda_2}[\bm{\nu}]
+    \bigg)
+    \label{eqn:natural-coadd-likelihood}
+\end{align}
+with the following definitions:
+\begin{itemize}
+    \item $z_{\lambda}[\bm{\mu}]$ is the coadd image in wavelength bin $\lambda$.
+    \item $\phi_{\lambda}[\bm{\mu}-\bm{\nu}]$ is the effective coadd PSF in wavelength bin $\lambda$.
+    \item $\hat{C}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ is the coadd noise covariance matrix, and the only term that relates different wavelength bins.
+\end{itemize}
+
+We can expand this in the same manner as the original likelihood to relate the two:
+\begin{align}
+\hat{L} =&
+    \frac{1}{2}\sum_{\lambda_1,\lambda_2}\sum_{\bm{\eta},\bm{\zeta}}
+    \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+    \;\hat{z}_{\lambda_1}[\bm{\eta}]
+    \;\hat{z}_{\lambda_2}[\bm{\zeta}]
+    \nonumber\\
+    &+
+    \frac{1}{2}\sum_{\lambda_1,\lambda_2}\sum_{\bm{\eta},\bm{\zeta}}
+    \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+    \bigg(
+        \sum_{\bm{\mu}}
+        \hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \; f_{\lambda_1}[\bm{\mu}]
+    \bigg)
+    \bigg(
+        \sum_{\bm{\nu}}
+        \hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+        \; f_{\lambda_2}[\bm{\nu}]
+    \bigg)
+    \nonumber\\
+    &-
+    \sum_{\lambda_1,\lambda_2}\sum_{\bm{\eta},\bm{\zeta}}
+    \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+    \;\hat{z}_{\lambda_1}[\bm{\eta}]
+    \bigg(
+        \sum_{\bm{\mu}}
+        \hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\mu}]
+        \; f_{\lambda_2}[\bm{\mu}]
+    \bigg)
+    \\
+    =&
+    \frac{1}{2}\sum_{\lambda_1,\lambda_2}
+    \Bigg[
+        \sum_{\bm{\eta},\bm{\zeta}}
+        \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+        \;\hat{z}_{\lambda_1}[\bm{\eta}]
+        \;\hat{z}_{\lambda_2}[\bm{\zeta}]
+    \Bigg]
+    \nonumber\\
+    &+
+    \frac{1}{2}\sum_{\lambda_1,\lambda_2}
+        \sum_{\bm{\mu},\bm{\nu}}
+        f_{\lambda_1}[\bm{\mu}]
+        \; f_{\lambda_2}[\bm{\nu}]
+    \Bigg[
+        \sum_{\bm{\eta},\bm{\zeta}}
+        \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+        \;\hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \;\hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+    \Bigg]
+    \nonumber\\
+    &-
+    \sum_{\lambda}
+    \sum_{\bm{\mu}}
+        f_{\lambda}[\bm{\mu}]
+    \Bigg[
+        \sum_{\lambda_1}
+        \sum_{\bm{\eta},\bm{\zeta}}
+        \hat{C}^{-1}_{\lambda_1,\lambda}[\bm{\eta},\bm{\zeta}]
+        \;\hat{z}_{\lambda_1}[\bm{\eta}]
+        \; \hat{\phi}_{\lambda}[\bm{\zeta}-\bm{\mu}]
+    \Bigg]
+\end{align}
+Grouping by factors of $f_{\lambda}(\bm{\mu})$, we can again identify the terms in square brackets in $\hat{L}$ as the same as those we identified in $L$, which means we are looking for a consistent factorization of the form
+\begin{align}
+    \kappa = &
+        \sum_{\bm{\eta},\bm{\zeta}}
+        \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+        \;\hat{z}_{\lambda_1}[\bm{\eta}]
+        \;\hat{z}_{\lambda_2}[\bm{\zeta}]
+    \label{eqn:kappa-factorization}
+    \\
+    \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}] =&
+        \sum_{\bm{\eta},\bm{\zeta}}
+        \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
+        \;\hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \;\hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+    \label{eqn:phi-factorization}
+    \\
+    \Psi_{\lambda_1}[\bm{\mu}] = &
+        \sum_{\eta,\nu}
+        \hat{C}_{\lambda_1,\lambda_2}^{-1}\![\bm{\eta},\bm{\zeta}]
+        \; \hat{z}_{\lambda_1}[\bm{\eta}]
+        \; \hat{\phi}_{\lambda_2}\![\bm{\zeta}-\bm{\mu}]
+    \label{eqn:psi-factorization}
+\end{align}
+
+Any such factorization is a sufficient statistic for $f_{\lambda}$ and thus an optimal coadd, but factorizations in which the number of nonzero off-diagonal elements of $\hat{C}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ is minimized are easier to use, easier to interpret, and more compact.
+
+\section{Constant, Uncorrelated Noise}
+
+The formalism of the previous section only requires that the noise on the input images be Gaussian; it permits any combination of spatial variation and correlation between pixels.
+The vast majority of astronomical images have very simple noise properties, at least to good approximation.
+Even adjacent pixels are typically very close to uncorrelated, and the only significant spatial variation in the variance is due to photon noise from bright objects.
+That spatial variation is explicitly ignored in many astronomical algorithms because including it either produces a negligible improvement in signal-to-noise ratio (because noise from the background dominates), or it increases exposure to systematic errors in regimes where the systematic errors dominate \citep[e.g. PSF photometry of bright stars;][]{2018PASJ...70S...5B}.
+Allowing small-scale spatially-varying noise to affect the relative weights of images in a coadd is particularly dangerous, as it can make the effective PSFs on those coadds a function of magnitude, in essence making the coadd's respond to flux nonlinear.
+
+This means that at the very least we should require all input image covariances $C_i[\bm{x}_i,\bm{y}_i]$ to be stationary; that is, they should depend on only $(\bm{x}_i-\bm{y}_i)$.
+We will go one step further, and require $C_i[\bm{x}_i,\bm{y}_i]$ to be a per-cell constant \emph{for the purposes of solving Eqns~\ref{eqn:kappa-factorization}-\ref{eqn:psi-factorization}}, and write it simply as $C_i$.
+After we have solved for $\hat{z}$, $\hat{\phi}$, and a preliminary $\hat{C}$, we will then propagate the original, fully-general noise covariance matrix to determine the final coadd noise covariance $\hat{C}$.
+This will make our image combination slightly lossy, but only in the rare case where some input images have significantly higher correlations between pixels than others.
 
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies
