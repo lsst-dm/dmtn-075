@@ -1,12 +1,12 @@
-
-
 \documentclass[DM,authoryear,toc]{lsstdoc}
 % lsstdoc documentation: https://lsst-texmf.lsst.io/lsstdoc.html
 
 % Package imports go here.
 \usepackage{bm}
+\usepackage{color}
 
 % Local commands go here.
+\newcommand{\todo}[1]{{\color{red}[#1]}}
 
 % To add a short-form title:
 % \title[Short title]{Title}
@@ -44,87 +44,114 @@ Design sketch and mathematics for a new approach to building coadds and constrai
 % Table of contents is added automatically with the "toc" class option.
 \maketitle
 
-\section{Mathematics}
+\section{Optimal Coadds}
 
-All quantities are defined within a single cell, which is a rectangle with integer-pixel boundaries in the coordinate systen.
+All quantities are defined within a single cell, which is a rectangle with integer-pixel boundaries in the coadd coordinate systen.
+Input-image quantities in cells enclose a larger area: they include any pixel that could contribute to that cell on the coadd.
+This means that some input-image pixels contribute to multiple cells.
 We assume that cells are sufficiently small that all PSFs, coordinate transforms, and backgrounds can be considered constant over any \emph{two} adjacent cells.
 
-Definitions:
+\subsection{Well-Sampled Data}
 
+Definitions:
 \begin{itemize}
-\item $\bm{\mu}$, $\bm{\nu}$: vector positions in coadd coordinates (each of $\bm{\mu}$ and $\bm{\nu}$ is a tuple of two coordinates)
+\item $\bm{\mu}$, $\bm{\nu}$: vector positions in coadd coordinates (each of $\bm{\mu}$ and $\bm{\nu}$ is a tuple of two coordinates).
 \item $\lambda$: an \emph{index} over wavelength bins
-\item $\alpha_{\lambda}(\bm{\mu})$: true above-the-atmosphere scene in coadd coordinates, integrated over wavelength bin $\lambda$, not including backgrounds.
-\item $\beta_{i,\lambda}$: sky and other backgrounds in input image $i$ and wavelength bin $\lambda$
 \item $\bm{A}_i$: affine mapping from input image $i$ coordinates $\bm{x}_i$to coadd coordinates.
 \item $\bm{x}_{i}$, $\bm{y}_i$: positions in the coordinate system of input image $i$ (each of $\bm{x}$ and $\bm{y}$ is a tuple of two coordinates).
-\item $\phi_{i,\lambda}(\bm{x})$: PSF that maps true-sky flux to observed flux in input image $i$ a distance $\bm{x}$ away (in input image pixel coordinates), integrated over wavelength bin $\lambda$.  Constrained such that
+\item $z_{i}[\bm{x}_i]$: the value of the pixel at $\bm{x}_i$ in input image $i$, including backgrounds.
+\item $\phi_{i,\lambda}(\bm{x}-\bm{y})$: PSF that maps true-sky flux at $\bm{x}$ to observed flux in input image $i$ at $\Delta\bm{y}$, integrated over wavelength bin $\lambda$.  Constrained such that
 $\int \phi_{i,\lambda}(\bm{x}) d^2\bm{x} = 1$ for all $\lambda$.
 \item $\tau_{i,\lambda}$: Photometric transmission that maps true-sky flux to observed flux in input image $i$, integrated over wavelength bin $\lambda$
-\item $z_{i}[\bm{x}]$: the value of the pixel at $\bm{x}$ in input image $i$, including backgrounds.
-\item $\sigma_{i,j}$: RMS uncertainty of pixel $j$ on input image $i$.  Assumed Gaussian and uncorrelated with neighboring pixels.
+\item $C_{i}[\bm{x}_i, \bm{y}_i]$: noise covariance between pixels $\bm{x}_i$ and $\bm{y}_i$ on input image $i$.  Assumed Gaussian and uncorrelated with neighboring pixels.
 \item $N$: the number of input images.
-\item $\bm{E}_i$: the set of all pixel indices in input image $i$.
 \item $W$: the number of wavelength bins.
+\item $\bm{E}_i$: the set of all pixel indices in input image $i$ that contribute to the current cell.
+\item $\bm{F}$: the set of all coadd pixel indices in the cell.
+\item $\alpha_{\lambda}(\bm{\mu})$: true above-the-atmosphere scene in coadd coordinates, integrated over wavelength bin $\lambda$, not including backgrounds.
+\item $\beta_{i,\lambda}$: sky and other backgrounds in input image $i$ and wavelength bin $\lambda$.
 \end{itemize}
 
-The log-likelihood for all input images is:
+We begin by using sinc interpolation to resample each input image to the input coordinate system:
+\begin{align}
+    \hat{z}_{i}[\bm{\mu}] =
+        \sum_{\bm{x}_i \in \bm{E}_i}
+            \mathrm{sinc}(\pi(\bm{A}_i^{-1}\bm{\mu} - \bm{x}_i))
+            \, z_{i}[\bm{x}_i]
+\end{align}
+with uncertainty
+\begin{align}
+    \hat{C}_{i}[\bm{\mu}, \bm{\nu}] =
+        \sum_{\bm{x}_i \in \bm{E}_i}
+            \mathrm{sinc}(\pi(\bm{A}_i^{-1}\bm{\mu} - \bm{x}_i))
+            \,\mathrm{sinc}(\pi(\bm{A}_i^{-1}\bm{\nu} - \bm{y}_i))
+            \, C_{i}[\bm{x}_i, \bm{y}_i]
+\end{align}
+and PSF
+\begin{align}
+    \hat{\phi}_{i,\lambda}(\bm{\mu}-\bm{\nu}) =
+        \frac{1}{|A_i|}
+        \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\mu} - \bm{A}_i^{-1}\bm{\nu})
+\end{align}
+The photometric calibration $\tau_{i,\lambda}$ and background $\beta_{i,\lambda}$ are unchanged under this transformation \todo{check this!}.
+
+The joint log-likelihood for all input images is then:
 \begin{align}
 L \equiv &
-    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{\bm{x} \in \bm{E}_i}
-        \frac{1}{\sigma_{i}^2[\bm{x}_i]}
+    \frac{1}{2} \sum_{i=0}^{N}
+        \sum_{\bm{\mu} \in \bm{F}}
+        \sum_{\bm{\nu} \in \bm{F}}
         \left[
-            z_{i}[\bm{x}_i]
+        \hat{C}_i^{-1}[\bm{\mu}, \bm{\nu}]
+        \right.
+        \\
+    & \quad \times
+        \left(
+            \hat{z}_i[\bm{\mu}]
             - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
             - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
                 \int\!
-                \, \phi_{i,\lambda}(\bm{x}_i - \bm{y}_i)
-                \, \alpha_{\lambda}(\bm{A}_i\bm{y}_i)
-                \, d^2\bm{y}_i
-        \right]^2 \\
-    = &
-    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{\bm{x} \in \bm{E}_i}
-        \frac{1}{\sigma_{i}^2[\bm{x}_i]}
-        \left[
-            z_{i}[\bm{x}_i]
+                \, \hat{\phi}_{i,\lambda}(\bm{\mu} - \bm{\eta})
+                \, \alpha_{\lambda}(\bm{\eta})
+                \, d^2\bm{\eta}
+        \right) \\
+    & \quad \times
+    \left.
+        \left(
+            \hat{z}_i[\bm{\nu}]
             - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
             - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
                 \int\!
-                \, \phi_{i,\lambda}(
-                    \bm{A}_i^{-1}[\bm{A}_i\bm{x}_i - \bm{\mu}]
-                )
-                \, \alpha_{\lambda}(\bm{\mu})
-                \, \frac{d^2\bm{\mu}}{|A_i|}
-        \right]^2
+                \, \hat{\phi}_{i,\lambda}(\bm{\nu} - \bm{\zeta})
+                \, \alpha_{\lambda}(\bm{\zeta})
+                \, d^2\bm{\zeta}
+        \right)
+    \right]
 \end{align}
 
-Regardless of whether the PSF of any particular image is well-sampled on that image's own grid, we can define the coadd coordinate system such that all input PSFs are well-sampled on its grid.
-This means we can exactly represent the PSF of an input image as a sinc-weighted sum over discrete evaluations:
+While the true sky contains power at arbitrarily small spatial scales, the PSFs do not; we can always choose the coadd coordinate system such that all
+input PSFs are well-sampled on that grid.
+We can thus exactly represent the continuous PSF as a sinc interpolation of
+discrete samples from it:
 \begin{align}
-    \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\mu})
-    = &
-     \sum_{\bm{\nu} \in \bm{P}}
-        \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\nu})
-        \, \mathrm{sinc}(\pi[\bm{\mu}-\bm{\nu}])
+    \hat{\phi}_{i,\lambda}(\bm{\mu}-\bm{\eta}) =
+    \sum_{\bm{\gamma} \in \bm{P}}
+        \mathrm{sinc}(\pi(\bm{\eta}-\bm{\gamma}))
+        \,\hat{\phi}_{i,\lambda}[\bm{\mu}-\bm{\gamma}]
 \end{align}
-Note that this is a 2-d sum over a 2-d sinc function.
-The limits $\bm{P}$ enclose the region where the transformed PSF is nonzero.
-Plugging this into the likelihood and rearranging,
+We can then insert this into the convolution integral,
 \begin{align}
-L = &
-    \frac{1}{2} \sum_{i=0}^{i<N} \sum_{\bm{x} \in \bm{E}_i}
-        \frac{1}{\sigma_{i}^2[\bm{x}_i]}
-        \left[
-            z_{i}[\bm{x}_i]
-            - \sum_{\lambda=0}^{\lambda < W} \beta_{i,\lambda}
-            - \sum_{\lambda=0}^{\lambda < W} \tau_{i,\lambda}
-                \sum_{\bm{\nu} \in \bm{P}}
-                    \phi_{i,\lambda}(\bm{A}_i^{-1}\bm{\nu})
-                \int\!
-                    \, \mathrm{sinc}(\pi[\bm{A}_i\bm{x}_i-\bm{\mu}-\bm{\nu}])
-                \, \alpha_{\lambda}(\bm{\mu})
-                \, \frac{d^2\bm{\mu}}{|A_i|}
-        \right]^2
+    \int\!
+        \, \hat{\phi}_{i,\lambda}(\bm{\mu}-\bm{\eta})
+        \, \alpha_{\lambda}(\bm{\eta})
+        \, d^2\bm{\eta}
+    = &
+    \sum_{\bm{\gamma} \in \bm{P}}
+        \,\hat{\phi}_{i,\lambda}[\bm{\mu}-\bm{\gamma}]
+        \int\!
+        \mathrm{sinc}(\pi(\bm{\eta}-\bm{\gamma}))
+        \, \alpha_{\lambda}(\bm{\eta})
+        \, d^2\bm{\eta}
 \end{align}
 
 % Include all the relevant bib files.
