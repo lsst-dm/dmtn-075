@@ -6,8 +6,8 @@
 \usepackage{color}
 
 % Local commands go here.
-
 \newcommand{\todo}[1]{{\color{red}[#1]}}
+\newcommand{\ft}[3]{\mathcal{F}_{#1}\!\left\{#3\right\}\!\left[#2\right]}
 
 % To add a short-form title:
 % \title[Short title]{Title}
@@ -65,37 +65,37 @@ This will make our image combination slightly lossy, but only in the rare case w
 Definitions:
 \begin{itemize}
 \item $\bm{\mu}$, $\bm{\nu}$: vector positions in coadd coordinates (each of $\bm{\mu}$ and $\bm{\nu}$ is a tuple of two coordinates).
-\item $\lambda$: an \emph{index} over wavelength bins
-\item $\bm{A}_i$: affine mapping from input image $i$ coordinates $\bm{x}_i$to coadd coordinates.
-\item $\bm{x}_{i}$, $\bm{y}_i$: positions in the coordinate system of input image $i$ (each of $\bm{x}$ and $\bm{y}$ is a tuple of two coordinates).
-\item $z_{i}[\bm{x}_i]$: the value of the pixel at $\bm{x}_i$ in input image $i$, after background subtraction.
-\item $\phi_{i,\lambda}(\bm{x}-\bm{y})$: PSF that maps true-sky flux at $\bm{x}$ to observed flux in input image $i$ at $\Delta\bm{y}$, integrated over wavelength bin $\lambda$.  Constrained such that
-$\int \phi_{i,\lambda}(\bm{x}) d^2\bm{x} = 1$ for all $\lambda$.
-\item $\tau_{i,\lambda}$: Photometric transmission that maps true-sky flux to observed flux in input image $i$, integrated over wavelength bin $\lambda$
-\item $V_{i}$: noise variance on input image $i$, assumed constant over the cell.
+\item $\lambda$: an \emph{jndex} over wavelength bins
+\item $\bm{A}_j$: affine mapping from input image $j$ coordinates $\bm{x}_j$to coadd coordinates.
+\item $\bm{x}_{j}$, $\bm{y}_j$: positions in the coordinate system of input image $j$ (each of $\bm{x}$ and $\bm{y}$ is a tuple of two coordinates).
+\item $z_{j}[\bm{x}_j]$: the value of the pixel at $\bm{x}_j$ in input image $j$, after background subtraction.
+\item $\phi_{j,\lambda}(\bm{\mu}-\bm{\nu})$: PSF that maps true-sky flux at $\bm{\nu}$ to observed flux in input image $j$ at $\bm{\mu}$, integrated over wavelength bin $\lambda$.  Note that this is defined in coadd coordinates, not input image coordinates, even though it includes the pixel response function of image $j$; this convention will simplify the notation of later steps.  Constrained such that
+$\int \phi_{j,\lambda}(\bm{\mu}) d^2\bm{\mu} = 1$ for all $\lambda$.
+\item $\tau_{j,\lambda}$: Photometric transmission that maps true-sky flux to observed flux in input image $j$, integrated over wavelength bin $\lambda$
+\item $V_{j}$: noise variance on input image $j$, assumed constant over the cell.
 \item $N$: the number of input images.
 \item $W$: the number of wavelength bins.
-\item $\bm{E}_i$: the set of all pixel indices in input image $i$ that contribute to the current cell.  $|E_i|$ is used to denote the total number of pixels from that image that contribute to the cell.  Bad pixels can simply be omitted from this set with no loss of generality.
+\item $\bm{E}_j$: the set of all pixel indices in input image $j$ that contribute to the current cell.  $|E_j|$ is used to denote the total number of pixels from that image that contribute to the cell.  Bad pixels can simply be omitted from this set with no loss of generality.
 \item $\bm{F}$: the set of all coadd pixel indices in the cell.  $|F|$ is used to denote the total number of pixels in the cell.
 \item $\alpha_{\lambda}(\bm{\mu})$: true above-the-atmosphere scene in coadd coordinates, integrated over wavelength bin $\lambda$, not including backgrounds.
 \end{itemize}
 
 The approach described here is a generalization of the method described by \citet{2015arXiv151206879Z}, and yields identical results when all input images are well-sampled, there are no missing pixels, and image PSFs are achromatic.  In that limit the input images can be perfectly resampled to a common grid in advance, which is the point at which their algorithm begins.
 
-Instead, we start from the joint log-likelihood of the true scene given all input images in their original coordinate systems, allowing us to handle both undersampled data and missing pixels.
+Instead, we start from the joint log-likelihood of the true scene given all input images in their original coordinate systems, allowing us to handle undersampled data.
 That log-likelihood is:
 \begin{align}
 L \equiv &
-    \frac{1}{2} \sum_{i=0}^{i<N}
-        \frac{1}{V_i}
-        \sum_{\bm{x}_i \in \bm{E}_i}
+    \frac{1}{2} \sum_{j=0}^{j<N}
+        \frac{1}{V_j}
+        \sum_{\bm{x}_j \in \bm{E}_j}
         \left(
-            z_i[\bm{x}_i]
+            z_j[\bm{x}_j]
             - \sum_{\lambda=0}^{\lambda < W}
-                \frac{\tau_{i,\lambda}}{|A_i|}
+                \tau_{j,\lambda}
                 \int\!
-                \phi_{i,\lambda}\!\left(
-                    \bm{x}_i - \bm{A}_i^{-1}(\bm{\nu})
+                \phi_{j,\lambda}\!\left(
+                    \bm{A}(\bm{x}_j) - \bm{\nu}
                 \right)
                 \; \alpha_{\lambda}(\bm{\nu})
                 \; d^2\bm{\nu}
@@ -107,23 +107,23 @@ input PSFs are well-sampled on that grid.
 We can thus exactly represent the continuous PSF as a sinc interpolation of
 discrete samples from it:
 \begin{align}
-    \phi_{i,\lambda}(\bm{x}_i-A_i^{-1}\bm{\nu}) =
+    \phi_{j,\lambda}\!\left(\bm{A_j}(\bm{x}_j)-\bm{\nu}\right) =
     \sum_{\bm{\mu} \in \bm{F}}
         \mathrm{sinc}\big(\pi(\bm{\nu}-\bm{\mu})\big)
-        \;\phi_{i,\lambda}\!\left(
-            \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+        \;\phi_{j,\lambda}\!\left(
+            \bm{A}_j(\bm{x}_j) - \bm{\mu}
         \right)
 \end{align}
 We can then insert this into the convolution integral,
 \begin{align}
     \int\!
-        \, \phi_{i,\lambda}\!\left(\bm{x}_i-\bm{A}_i^{-1}(\bm{\mu})\right)
+        \, \phi_{j,\lambda}\!\left(\bm{A}_j(\bm{x}_j)-\bm{\mu}\right)
         \, \alpha_{\lambda}(\bm{\mu})
         \, d^2\bm{\mu}
     = &
     \sum_{\bm{\mu} \in \bm{F}}
-        \;\phi_{i,\lambda}\!\left(
-            \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+        \;\phi_{j,\lambda}\!\left(
+            \bm{A}_j(\bm{x}_j) - \bm{\mu}
         \right)
         \!\int\!
         \mathrm{sinc}\big(\pi(\bm{\nu}-\bm{\mu})\big)
@@ -131,8 +131,8 @@ We can then insert this into the convolution integral,
         \; d^2\bm{\nu} \\
     = &
     \sum_{\bm{\mu} \in \bm{F}}
-        \;\phi_{i,\lambda}\!\left(
-            \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+        \;\phi_{j,\lambda}\!\left(
+            \bm{A}(\bm{x}_j) - \bm{\mu}
         \right)
         \, f_{\lambda}(\bm{\mu})
 \end{align}
@@ -149,16 +149,16 @@ We therefore consider any sufficient statistic for $f_{\lambda}$ to also be a su
 We can now substitute this into the joint likelihood:
 \begin{align}
 L = &
-    \frac{1}{2} \sum_{i=0}^{i<N}
-        \frac{1}{V_i}
-        \sum_{\bm{x}_i \in \bm{E}_i}
+    \frac{1}{2} \sum_{j=0}^{j<N}
+        \frac{1}{V_j}
+        \sum_{\bm{x}_j \in \bm{E}_j}
         \left(
-            z_i[\bm{x}_i]
+            z_j[\bm{x}_j]
             - \sum_{\lambda=0}^{\lambda < W}
-                \frac{\tau_{i,\lambda}}{|A_i|}
+                \tau_{j,\lambda}
                 \sum_{\bm{\mu} \in \bm{F}}
-                        \;\phi_{i,\lambda}\!\left(
-                            \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+                        \;\phi_{j,\lambda}\!\left(
+                            \bm{A}_j(\bm{x}_j) - \bm{\mu}
                         \right)
                         \, f_{\lambda}(\bm{\mu})
         \right)^2
@@ -166,34 +166,34 @@ L = &
 expand the terms:
 \begin{align}
 L =&
-        \sum_{i=0}^{i<N}
-        \frac{1}{2V_i}
-        \sum_{\bm{x}_i \in \bm{E}_i}
-        \left(z_i[\bm{x}_i]\right)^2
+        \sum_{j=0}^{j<N}
+        \frac{1}{2V_j}
+        \sum_{\bm{x}_j \in \bm{E}_j}
+        \left(z_j[\bm{x}_j]\right)^2
 \nonumber\\
 &\;-
-    \sum_{i=0}^{i<N}
-        \frac{1}{V_i}
-        \sum_{\bm{x}_i \in \bm{E}_i}
-        \; z_i[\bm{x}_i]
+    \sum_{j=0}^{j<N}
+        \frac{1}{V_j}
+        \sum_{\bm{x}_j \in \bm{E}_j}
+        \; z_j[\bm{x}_j]
         \sum_{\lambda=0}^{\lambda < W}
-            \frac{\tau_{i,\lambda}}{|A_i|}
+            \tau_{j,\lambda}
             \sum_{\bm{\mu} \in \bm{F}}
-                    \;\phi_{i,\lambda}\!\left(
-                        \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+                    \;\phi_{j,\lambda}\!\left(
+                        \bm{A}_j(\bm{x}_j) - \bm{\mu}
                     \right)
                     \, f_{\lambda}(\bm{\mu})
 \nonumber\\
 &\;+
-    \sum_{i=0}^{i<N}
-        \frac{1}{2V_i}
-        \sum_{\bm{x}_i \in \bm{E}_i}
+    \sum_{j=0}^{j<N}
+        \frac{1}{2V_j}
+        \sum_{\bm{x}_j \in \bm{E}_j}
         \left(
             \sum_{\lambda=0}^{\lambda < W}
-                \frac{\tau_{i,\lambda}}{|A_i|}
+                \tau_{j,\lambda}
                 \sum_{\bm{\mu} \in \bm{F}}
-                        \;\phi_{i,\lambda}\!\left(
-                            \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+                        \;\phi_{j,\lambda}\!\left(
+                            \bm{A}_j(\bm{x}_j) - \bm{\mu}
                         \right)
                         \, f_{\lambda}(\bm{\mu})
         \right)^2
@@ -203,10 +203,10 @@ and reorder the sums (consolidating some for brevity):
 L =&
     \frac{1}{2}
         \Bigg[
-            \sum_{i}
-            \frac{1}{V_i}
-            \sum_{\bm{x}_i}
-            \left(z_i[\bm{x}_i]\right)^2
+            \sum_{j}
+            \frac{1}{V_j}
+            \sum_{\bm{x}_j}
+            \left(z_j[\bm{x}_j]\right)^2
         \Bigg]
     \nonumber\\
 &\; -
@@ -214,12 +214,12 @@ L =&
     \sum_{\bm{\mu}}
     f_{\lambda}(\bm{\mu})
     \left[
-        \sum_{i}
-        \frac{\tau_{i,\lambda}}{V_i|A_i|}
-        \sum_{\bm{x}_i}
-            \; z_i[\bm{x}_i]
-            \; \phi_{i,\lambda}\!\left(
-                \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+        \sum_{j}
+        \frac{\tau_{j,\lambda}}{V_j}
+        \sum_{\bm{x}_j}
+            \; z_j[\bm{x}_j]
+            \; \phi_{j,\lambda}\!\left(
+                \bm{A}_j(\bm{x}_j) - \bm{\mu}
             \right)
     \right]
     \nonumber\\
@@ -230,19 +230,19 @@ L =&
         f_{\lambda_1}(\bm{\mu}) \;
         f_{\lambda_2}(\bm{\nu}) \;
         \Bigg[
-        \sum_{i}
+        \sum_{j}
             \frac{
-                \tau_{i,\lambda_1}
-                \tau_{i,\lambda_2}
+                \tau_{j,\lambda_1}
+                \tau_{j,\lambda_2}
             }{
-                V_i |A_i|^2
+                V_j
             }
-            \sum_{\bm{x}_i}
-            \; \phi_{i,\lambda_1}\!\left(
-                    \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+            \sum_{\bm{x}_j}
+            \; \phi_{j,\lambda_1}\!\left(
+                \bm{A}_j(\bm{x}_j) - \bm{\mu}
             \right)
-            \; \phi_{i,\lambda_2}\!\left(
-                \bm{x}_i - \bm{A}_i^{-1}(\bm{\nu})
+            \; \phi_{j,\lambda_2}\!\left(
+                \bm{A}_j(\bm{x}_j) - \bm{\nu}
             \right)
         \Bigg]
 \end{align}
@@ -251,38 +251,38 @@ The three terms in square brackets include all sums over images, and together co
 Defining them as
 \begin{align}
     \kappa \equiv &
-        \sum_{i}
-            \frac{1}{V_i}
-        \sum_{\bm{x}_i}
-            \left(z_i[\bm{x}_i]\right)^2
-        \equiv \sum_{i} \kappa_i
+        \sum_{j}
+            \frac{1}{V_j}
+        \sum_{\bm{x}_j}
+            \left(z_j[\bm{x}_j]\right)^2
+        \equiv \sum_{j} \kappa_j
     \\
     \Psi_{\lambda}[\bm{\mu}] \equiv &
-        \sum_{i}
-        \frac{\tau_{i,\lambda}}{V_i |A_i|}
-        \sum_{\bm{x}_i}
-            \; z_i[\bm{x}_i]
-            \; \phi_{i,\lambda}\!\left(
-                \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+        \sum_{j}
+        \frac{\tau_{j,\lambda}}{V_j}
+        \sum_{\bm{x}_j}
+            \; z_j[\bm{x}_j]
+            \; \phi_{j,\lambda}\!\left(
+                \bm{A}_j(\bm{x}_j) - \bm{\mu}
             \right)
-        \equiv \sum_{i} \Psi_{i,\lambda}[\bm{\mu}]
+        \equiv \sum_{j} \Psi_{j,\lambda}[\bm{\mu}]
     \\
     \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}] \equiv &
-        \sum_{i}
-            \frac{
-                \tau_{i,\lambda_1}
-                \tau_{i,\lambda_2}
-            }{
-                V_i |A_i|^2
-            }
-        \sum_{\bm{x}_i}
-            \phi_{i,\lambda_1}\!\left(
-                    \bm{x}_i - \bm{A}_i^{-1}(\bm{\mu})
+        \sum_{j}
+        \frac{
+            \tau_{j,\lambda_1}
+            \tau_{j,\lambda_2}
+        }{
+            V_j
+        }
+        \sum_{\bm{x}_j}
+            \phi_{j,\lambda_1}\!\left(
+                \bm{A}(\bm{x}_j) - \bm{\mu}
             \right)
-            \; \phi_{i,\lambda_2}\!\left(
-                \bm{x}_i - \bm{A}_i^{-1}(\bm{\nu})
+            \; \phi_{j,\lambda_2}\!\left(
+                \bm{A}(\bm{x}_j) - \bm{\nu}
             \right)
-    \equiv \sum_{i} \Phi_{i,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \equiv \sum_{j} \Phi_{j,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
 \end{align}
 we can rewrite the likelihood as
 \begin{align}
@@ -304,20 +304,116 @@ L =&
 Together these already constitutes a coadd of sorts, but this representation is difficult to use and not at all compact; while $\kappa$ is a scalar and $\Psi[\bm{\mu}]$ is one image for each wavelength bin (a total of $W\times|F|$ elements), $\Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ has $W^2 \times |F|^2$ elements.
 For any realistic number of input epochs and practical cell sizes, that will be more than the total number of input data points.
 
-This indicates that this representation contains significant redundant information, but before tackling the problem of how to compress it we will first address the question of what makes a coadd ``easy to use''.
-Our definition is that such a coadd's likelihood should have a form similar to that of an individual image:
+This indicates that this representation contains significant redundant information, and to find a more compact representation, we follow \citet{2015arXiv151206879Z} and examine the Fourier transform of the per-epoch contributions to $\Phi$:
 \begin{align}
-\hat{L} =&
-    \frac{1}{2}\sum_{\bm{\eta},\bm{\zeta}}
+    \mathcal{F}_{\bm{\mu}}\!\left\{
+        \phi_{j,\lambda}\!\left(\bm{A}_j(\bm{x}_j) - \bm{\mu}\right)
+    \right\}\!\left(\bm{r}\right)
+    =&
+    \mathcal{F}^*_{\bm{\mu}}\!\left\{
+        \phi_{j,\lambda}\!\left(\bm{\mu}\right)
+    \right\}\!\left(\bm{r}\right)
+    \; e^{-2\pi i \bm{r}\cdot \left[\bm{A}_j(\bm{x}_j)\right]}
+\end{align}
+\begin{align}
+    \mathcal{F}_{\bm{\mu},\bm{\nu}}\!\left\{
+        \Phi_{j,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \right\}\!\left(\bm{r},\bm{s}\right)
+     = & \frac{
+            \tau_{j,\lambda_1}
+            \tau_{j,\lambda_2}
+        }{
+            V_j
+        }
+        \mathcal{F}^*_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_1}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+        \;
+        \mathcal{F}_{\bm{\nu}}\!\left\{
+            \phi_{j,\lambda_2}\!\left(\bm{\nu}\right)
+        \right\}\!\left(\bm{s}\right)
+        \sum_{\bm{x}_j}
+        \;
+        e^{-2\pi i (\bm{r} - \bm{s}) \cdot \bm{A}_j(\bm{x}_j)}
+\\
+    =&
+        \delta\!\left(\bm{r}-\bm{s}\right)
+        \frac{
+            \tau_{j,\lambda_1}
+            \tau_{j,\lambda_2}
+        }{
+            V_j \; |A_j|
+        }
+        \;
+        \mathcal{F}^*_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_1}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+        \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_2}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+\end{align}
+This is \emph{significantly} more compact: we only need to accumulate weighted products of the Fourier transforms of the input image PSFs:
+\begin{align}
+    \mathcal{F}_{\bm{\mu},\bm{\nu}}\!\left\{
+        \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \right\}\!\left(\bm{r},\bm{s}\right)
+    =&
+    \delta\!\left(\bm{r}-\bm{s}\right)
+    \sum_j
+        \frac{
+            \tau_{j,\lambda_1}
+            \tau_{j,\lambda_2}
+        }{
+            V_j \; |A_j|
+        }
+        \;
+        \mathcal{F}^*_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_1}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+        \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_2}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+    \\
+    \widetilde{\Phi}_{\lambda_1,\lambda_2}(\bm{r})
+    \equiv &
+    \sum_j
+        \frac{
+            \tau_{j,\lambda_1}
+            \tau_{j,\lambda_2}
+        }{
+            V_j \; |A_j|
+        }
+        \;
+        \mathcal{F}^*_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_1}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+        \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \phi_{j,\lambda_2}\!\left(\bm{\mu}\right)
+        \right\}\!\left(\bm{r}\right)
+\label{eqn:phi-fourier-inputs}
+\end{align}
+
+The Fourier transform of $\Phi$ contains all the information of $\Phi$, but we would of course prefer to utilize it without actually having to perform the inverse Fourier transform.
+To do that, we should first address the question of what makes a coadd ``easy to use''.
+Our definition is that a coadd's likelihood should have a form similar to that of an individual image:
+\begin{align}
+\bar{L} =&
+    \frac{1}{2}
+    \sum_{\lambda_1,\lambda_2}
+    \bm{C}^{-1}_{\lambda_1,\lambda_2}
+    \sum_{\bm{\eta}}
     \bigg(
-        \hat{z}_{\lambda_1}[\bm{\eta}]
-        - \sum_{\bm{\mu}}\hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \bar{z}_{\lambda_1}[\bm{\eta}]
+        - \sum_{\bm{\mu}}\bar{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
         \; f_{\lambda_1}[\bm{\mu}]
     \bigg)
-    \; \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
-    \; \bigg(
-        \hat{z}_{\lambda_2}[\bm{\zeta}]
-        - \sum_{\bm{\nu}}\hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+    \;
+    \bigg(
+        \bar{z}_{\lambda_2}[\bm{\eta}]
+        - \sum_{\bm{\nu}}\bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\nu}]
         \; f_{\lambda_2}[\bm{\nu}]
     \bigg)
     \label{eqn:natural-coadd-likelihood}
@@ -326,31 +422,33 @@ with the following definitions:
 \begin{itemize}
     \item $z_{\lambda}[\bm{\mu}]$ is the coadd image in wavelength bin $\lambda$.
     \item $\phi_{\lambda}[\bm{\mu}-\bm{\nu}]$ is the effective coadd PSF in wavelength bin $\lambda$.
-    \item $\hat{C}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ is the coadd noise covariance matrix, and the only term that relates different wavelength bins.
+    \item $\bar{C}_{\lambda_1,\lambda_2}$ is the coadd noise covariance matrix.
 \end{itemize}
-Note that we do not expect the coadd noise to be stationary or uncorrelated, and we are attempting to generate a different image for every wavelength bin.
+Note that we are attempting to generate a different coadd image for every wavelength bin; it would clearly be unreasonable to expect these to be uncorrelated.
+This definition is thus a generalization of the \emph{proper} coadd concept of \citet{2015arXiv151206879Z} to multiple wavelength bins.
 
 We can expand this in the same manner as the original likelihood to relate the two:
 \begin{align}
-\hat{L}=&
-    \frac{1}{2}\sum_{\lambda_1,\lambda_2}
+\bar{L}=&
+    \frac{1}{2}
     \Bigg[
-        \sum_{\bm{\eta},\bm{\zeta}}
-        \hat{z}_{\lambda_1}[\bm{\eta}]
-        \;\hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
-        \;\hat{z}_{\lambda_2}[\bm{\zeta}]
+        \sum_{\lambda_1,\lambda_2}
+        \bar{C}^{-1}_{\lambda_1,\lambda_2}
+        \sum_{\bm{\eta}}
+        \bar{z}_{\lambda_1}[\bm{\eta}]
+        \;\bar{z}_{\lambda_2}[\bm{\eta}]
     \Bigg]
 \nonumber\\
 &-
-    \sum_{\lambda}
+    \sum_{\lambda_1}
     \sum_{\bm{\mu}}
-        f_{\lambda}[\bm{\mu}]
+        f_{\lambda_1}[\bm{\mu}]
     \Bigg[
-        \sum_{\lambda_1}
-        \sum_{\bm{\eta},\bm{\zeta}}
-        \hat{z}_{\lambda_1}[\bm{\eta}]
-        \; \hat{C}^{-1}_{\lambda_1,\lambda}[\bm{\eta},\bm{\zeta}]
-        \; \hat{\phi}_{\lambda}[\bm{\zeta}-\bm{\mu}]
+        \sum_{\lambda_2}
+        \bar{C}^{-1}_{\lambda_1,\lambda_2}
+        \sum_{\bm{\eta}}
+        \bar{z}_{\lambda_2}[\bm{\eta}]
+        \; \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\mu}]
     \Bigg]
 \nonumber\\
 &+
@@ -359,38 +457,242 @@ We can expand this in the same manner as the original likelihood to relate the t
         f_{\lambda_1}[\bm{\mu}]
         \; f_{\lambda_2}[\bm{\nu}]
     \Bigg[
-        \sum_{\bm{\eta},\bm{\zeta}}
-        \hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
-        \; \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
-        \; \hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+        \bar{C}^{-1}_{\lambda_1,\lambda_2}
+        \sum_{\bm{\eta}}
+        \bar{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \; \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\nu}]
     \Bigg]
 \end{align}
-Grouping by factors of $f_{\lambda}(\bm{\mu})$, we can again identify the terms in square brackets in $\hat{L}$ as the same as those we identified in $L$, which means we need to solve
+Grouping by factors of $f_{\lambda}(\bm{\mu})$, we can again identify the terms in square brackets in $\bar{L}$ as the same as those we identified in $L$, which means we need to solve
 \begin{align}
     \kappa = &
-        \sum_{\bm{\eta},\bm{\zeta}}
-        \hat{z}_{\lambda_1}[\bm{\eta}]
-        \; \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
-        \; \hat{z}_{\lambda_2}[\bm{\zeta}]
+        \sum_{\lambda_1,\lambda_2}
+        \bar{C}^{-1}_{\lambda_1,\lambda_2}
+        \sum_{\bm{\eta}}
+        \bar{z}_{\lambda_1}[\bm{\eta}]
+        \; \bar{z}_{\lambda_2}[\bm{\eta}]
     \label{eqn:kappa-factorization}
     \\
-    \Psi_{\lambda_1}[\bm{\nu}] = &
-        \sum_{\eta,\nu}
-        \hat{z}_{\lambda_1}[\bm{\eta}]
-        \; \hat{C}_{\lambda_1,\lambda_2}^{-1}\![\bm{\eta},\bm{\zeta}]
-        \; \hat{\phi}_{\lambda_2}\![\bm{\zeta}-\bm{\nu}]
+    \Psi_{\lambda_1}[\bm{\mu}] = &
+        \sum_{\lambda_2}
+        \bar{C}_{\lambda_1,\lambda_2}^{-1}
+        \sum_{\eta}
+        \bar{z}_{\lambda_1}[\bm{\eta}]
+        \; \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\mu}]
     \label{eqn:psi-factorization}
     \\
-    \Phi_{\lambda_1,\lambda_2}[\bm{\mu}, \bm{\nu}] = &
-        \sum_{\bm{\eta},\bm{\zeta}}
-        \hat{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
-        \; \hat{C}^{-1}_{\lambda_1,\lambda_2}[\bm{\eta},\bm{\zeta}]
-        \; \hat{\phi}_{\lambda_2}[\bm{\zeta}-\bm{\nu}]
+    \Phi_{\lambda_1,\lambda_2}[\bm{\mu}, \bm{\nu}] = &\;
+        \bar{C}^{-1}_{\lambda_1,\lambda_2}
+        \sum_{\bm{\eta}}
+        \bar{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+        \; \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\nu}]
     \label{eqn:phi-factorization}
 \end{align}
-for $\hat{z}$, $\hat{\phi}$, and $\hat{C}$.
-Any solution is a sufficient statistic for $f_{\lambda}$ and thus an optimal coadd, but solutions that minimize the number of nonzero off-diagonal elements of $\hat{C}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ are easier to use, easier to interpret, and more compact.
+for $\bar{z}$, $\bar{\phi}$, and $\bar{C}$.
+As we will see, Eqn.~\ref{eqn:kappa-factorization} will not actually be needed.
 
+Because we are expecting to accumulate $\Phi$ in Fourier space, we will start our search for a solution by computing the Fourier transform of Eqn.~\ref{eqn:phi-factorization}:
+\begin{align}
+    \widetilde{\Phi}_{\lambda_1,\lambda_2}[\bm{r}]
+    \;
+    \delta(\bm{r}-\bm{s})
+=&\;
+    \mathcal{F}_{\bm{\mu},\bm{\nu}}\!\left\{
+        \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \right\}\!\left[\bm{r},\bm{s}\right]
+\\
+=&\;
+    \bar{C}^{-1}_{\lambda_1,\lambda_2}
+    \sum_{\bm{\eta}}
+    \mathcal{F}_{\bm{\mu}}\!\left\{
+        \bar{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
+    \right\}\!\left[
+        \bm{r}
+    \right]
+    \;
+    \mathcal{F}_{\bm{\nu}}\!\left\{
+        \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\nu}]
+    \right\}\!\left[
+        \bm{s}
+    \right]
+\\
+=&\;
+    \bar{C}^{-1}_{\lambda_1,\lambda_2}
+    \;
+    \mathcal{F}^*_{\bm{\mu}}\!\left\{
+        \bar{\phi}_{\lambda_1}[\bm{\mu}]
+    \right\}\!\left[
+        \bm{r}
+    \right]
+    \;
+    \mathcal{F}_{\bm{\nu}}\!\left\{
+        \bar{\phi}_{\lambda_2}[\bm{\nu}]
+    \right\}\!\left[
+        \bm{s}
+    \right]
+    \sum_{\bm{\eta}}
+    e^{-2\pi i \bm{\eta}\cdot(\bm{r}-\bm{s})}
+\\
+=&\;
+    \bar{C}^{-1}_{\lambda_1,\lambda_2}
+    \;
+    \mathcal{F}^*_{\bm{\mu}}\!\left\{
+        \bar{\phi}_{\lambda_1}[\bm{\mu}]
+    \right\}\!\left[
+        \bm{r}
+    \right]
+    \;
+    \mathcal{F}_{\bm{\mu}}\!\left\{
+        \bar{\phi}_{\lambda_2}[\bm{\mu}]
+    \right\}\!\left[
+        \bm{r}
+    \right]
+    \;
+    \delta(\bm{r}-\bm{s})
+\end{align}
+The presence of a delta function on the right-hand side validates our previous assumption that the coadd pixel noise is uncorrelated within wavelength bins.
+We can now drop them from both sides:
+\begin{align}
+    \widetilde{\Phi}_{\lambda_1,\lambda_2}[\bm{r}]
+= & \;
+    \bar{C}^{-1}_{\lambda_1,\lambda_2}
+    \;
+    \mathcal{F}^*_{\bm{\mu}}\!\left\{
+        \bar{\phi}_{\lambda_1}[\bm{\mu}]
+    \right\}\!\left[
+        \bm{r}
+    \right]
+    \;
+    \mathcal{F}_{\bm{\mu}}\!\left\{
+        \bar{\phi}_{\lambda_2}[\bm{\mu}]
+    \right\}\!\left[
+        \bm{r}
+    \right]
+\end{align}
+We can use this to obtain $\bar{\phi}$ and $\bar{C}^{-1}$ with the following procedure.
+\begin{itemize}
+\item For each wavelength bin $\lambda$, compute
+    \begin{align}
+        p{_\lambda}[\bm{\mu}]
+        \mathrel{\mathop:}= &\;
+        \mathcal{F}_{\bm{\mu}}^{-1}\!\left\{
+            \sqrt{\widetilde{\Phi}_{\lambda,\lambda}[\bm{r}]}
+        \right\}\![
+            \bm{\mu}
+        ]
+        \\
+        \bar{C}^{-1}_{\lambda,\lambda}
+        \mathrel{\mathop:}= &\;
+        \left(\sum_{\bm{\mu}} p_{\lambda}[\bm{\mu}]\right)^2
+        \\
+        \bar{\phi}_{\lambda}[\bm{\mu}]
+        \mathrel{\mathop:}= &\;
+        \frac{p_{\lambda}[\bm{\mu}]}{\sqrt{\bar{C}_{\lambda,\lambda}}}
+        \label{eqn:solution-diagonal-psfs}
+    \end{align}
+\item For every pair of wavelength bins $\lambda_1 \ne \lambda_2$, compute
+    \begin{align}
+        \bar{C}^{-1}_{\lambda_1,\lambda_2}
+        \mathrel{\mathop:}= &\;
+        \frac{
+            \widetilde{\Phi}_{\lambda_1,\lambda_2}[\bm{r}]
+        }{
+            \mathcal{F}_{\bm{\mu}}^{-1}\!\left\{
+                \bar{\phi}^*_{\lambda_1}[\bm{\mu}]
+            \right\}\![\bm{r}]
+            \;
+            \mathcal{F}_{\bm{\mu}}^{-1}\!\left\{
+                \bar{\phi}_{\lambda_2}[\bm{\mu}]
+            \right\}\![\bm{r}]
+        }
+        \label{eqn:solution-offdiagonal-covariances}
+    \end{align}
+\end{itemize}
+
+To obtain $\bar{z}_{\lambda}[\bm{\mu}]$, we examine the Fourier transform of $\Psi_{\lambda}[\bm{\mu}]$:
+\begin{align}
+    \mathcal{F}_{\bm{\mu}}\!\left\{
+        \Psi_{\lambda_1}(\bm{\mu})
+    \right\}\!\left[
+        \bm{r}
+    \right]
+    = &
+        \sum_{\lambda_2}
+        \bar{C}_{\lambda_1,\lambda_2}^{-1}
+        \sum_{\eta}
+        \bar{z}_{\lambda_1}[\bm{\eta}]
+        \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\mu}]
+        \right\}\!\left[
+            \bm{r}
+        \right]
+    \\
+    = &
+        \sum_{\lambda_2}
+        \bar{C}_{\lambda_1,\lambda_2}^{-1}
+        \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \bar{\phi}^*_{\lambda_2}[\bm{\mu}]
+        \right\}\!\left[
+            \bm{r}
+        \right]
+        \sum_{\eta}
+        \bar{z}_{\lambda_1}[\bm{\eta}]
+        \;
+        e^{-2\pi i \bm{\eta}\cdot\bm{r}}
+    \\
+    = & \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \bar{z}_{\lambda_1}[\bm{\mu}]
+        \right\}\!\left[
+            \bm{r}
+        \right]
+        \;
+        \sum_{\lambda_2}
+        \bar{C}_{\lambda_1,\lambda_2}^{-1}
+        \;
+        \mathcal{F}_{\bm{\mu}}\!\left\{
+            \bar{\phi}^*_{\lambda_2}[\bm{\mu}]
+        \right\}\!\left[
+            \bm{r}
+        \right]
+\end{align}
+Rearranging, we have:
+\begin{align}
+    \bar{z}_{\lambda_1}[\bm{\mu}]
+    =&\;
+    \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+        \frac{
+            \mathcal{F}_{\bm{\mu}}\!\left\{
+                \Psi_{\lambda_1}(\bm{\mu})
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }{
+            \sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\mu}}\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\mu}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        \right\}\!\left[
+        \bm{\mu}
+    \right]
+    \label{eqn:solution-image}
+\end{align}
+
+Together, Eqns.~\ref{eqn:solution-diagonal-psfs}, \ref{eqn:solution-offdiagonal-covariances}, and \ref{eqn:solution-image} constitute a complete solution to Eqns.~\ref{eqn:psi-factorization} and \ref{eqn:phi-factorization}, and hence a complete prescription for building a coadd that is a sufficient statistic for the input data when:
+\begin{itemize}
+    \item the noise on all input images is stationary and uncorrelated;
+    \item no input images have missing pixels.
+\end{itemize}
+We will address both limitations in the next section.
+
+\section{Realistic Noise}
 
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies
