@@ -256,6 +256,7 @@ Defining them as
         \sum_{\bm{x}_j}
             \left(z_j[\bm{x}_j]\right)^2
         \equiv \sum_{j} \kappa_j
+    \label{eqn:kappa-accumulated}
     \\
     \Psi_{\lambda}[\bm{\mu}] \equiv &
         \sum_{j}
@@ -266,6 +267,7 @@ Defining them as
                 \bm{A}_j(\bm{x}_j) - \bm{\mu}
             \right)
         \equiv \sum_{j} \Psi_{j,\lambda}[\bm{\mu}]
+    \label{eqn:psi-accumulated}
     \\
     \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}] \equiv &
         \sum_{j}
@@ -283,6 +285,7 @@ Defining them as
                 \bm{A}(\bm{x}_j) - \bm{\nu}
             \right)
     \equiv \sum_{j} \Phi_{j,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \label{eqn:phi-accumulated}
 \end{align}
 we can rewrite the likelihood as
 \begin{align}
@@ -304,40 +307,63 @@ L =&
 Together these already constitutes a coadd of sorts, but this representation is difficult to use and not at all compact; while $\kappa$ is a scalar and $\Psi[\bm{\mu}]$ is one image for each wavelength bin (a total of $W\times|F|$ elements), $\Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]$ has $W^2 \times |F|^2$ elements.
 For any realistic number of input epochs and practical cell sizes, that will be more than the total number of input data points.
 
-This indicates that this representation contains significant redundant information, and to find a more compact representation, we follow \citet{2015arXiv151206879Z} and examine the Fourier transform of the per-epoch contributions to $\Phi$:
+This indicates that this representation contains significant redundant information, and to find a more compact representation, we follow \citet{2015arXiv151206879Z} and examine the Fourier transform of the per-epoch contributions to $\Phi$.
+
+We will define the 2-d forward Fourier transform and its inverse as
+\begin{align}
+    \mathcal{F}_{\bm{\mu}}\!\left\{f[\bm{\mu}]\right\}\![\bm{r}]
+    \equiv&\;
+    \sum_{\bm{\mu}\in{\bm{F}}}
+    f[\bm{\mu}]
+    \,
+    e^{-\frac{2\pi i}{|F|} \bm{\mu}\cdot\bm{r}}
+    \\
+    \mathcal{F}_{\bm{r}}^{-1}\!\left\{g[\bm{r}]\right\}\![\bm{\mu}]
+    \equiv&\;
+    \frac{1}{|F|}
+    \sum_{\bm{r}\in\bm{F}}
+    g[\bm{r}]
+    \,
+    e^{\frac{2\pi i}{|F|} \bm{r}\cdot\bm{\mu}}
+\end{align}
+These are discrete transforms in coadd coordinates (the only coordinate system in which we will ever apply Fourier transforms).
+
+We then proceed with the Fourier transform of $\phi_{j,\lambda}$:
 \begin{align}
     \mathcal{F}_{\bm{\mu}}\!\left\{
         \phi_{j,\lambda}\!\left(\bm{A}_j(\bm{x}_j) - \bm{\mu}\right)
     \right\}\!\left(\bm{r}\right)
-    =&
+    =&\;
     \mathcal{F}^*_{\bm{\mu}}\!\left\{
-        \phi_{j,\lambda}\!\left(\bm{\mu}\right)
+        \phi_{j,\lambda}\!\left[\bm{\mu}\right]
     \right\}\!\left(\bm{r}\right)
-    \; e^{-2\pi i \bm{r}\cdot \left[\bm{A}_j(\bm{x}_j)\right]}
+    \, e^{-\frac{2\pi i}{|F|} \bm{r}\cdot \bm{A}_j(\bm{x}_j)}
 \end{align}
 \begin{align}
     \mathcal{F}_{\bm{\mu},\bm{\nu}}\!\left\{
         \Phi_{j,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
     \right\}\!\left(\bm{r},\bm{s}\right)
-     = & \frac{
+    =&\;
+        \frac{
             \tau_{j,\lambda_1}
             \tau_{j,\lambda_2}
         }{
             V_j
         }
         \mathcal{F}^*_{\bm{\mu}}\!\left\{
-            \phi_{j,\lambda_1}\!\left(\bm{\mu}\right)
+            \phi_{j,\lambda_1}\!\left[\bm{\mu}\right]
         \right\}\!\left(\bm{r}\right)
         \;
         \mathcal{F}_{\bm{\nu}}\!\left\{
-            \phi_{j,\lambda_2}\!\left(\bm{\nu}\right)
+            \phi_{j,\lambda_2}\!\left[\bm{\nu}\right]
         \right\}\!\left(\bm{s}\right)
         \sum_{\bm{x}_j}
         \;
-        e^{-2\pi i (\bm{r} - \bm{s}) \cdot \bm{A}_j(\bm{x}_j)}
-\\
-    =&
+        e^{-\frac{2\pi i}{|F|} (\bm{r} - \bm{s}) \cdot \bm{A}_j(\bm{x}_j)}
+    \\
+    =&\;
         \delta\!\left(\bm{r}-\bm{s}\right)
+        |F^+|
         \frac{
             \tau_{j,\lambda_1}
             \tau_{j,\lambda_2}
@@ -346,11 +372,11 @@ This indicates that this representation contains significant redundant informati
         }
         \;
         \mathcal{F}^*_{\bm{\mu}}\!\left\{
-            \phi_{j,\lambda_1}\!\left(\bm{\mu}\right)
+            \phi_{j,\lambda_1}\!\left[\bm{\mu}\right]
         \right\}\!\left(\bm{r}\right)
         \;
         \mathcal{F}_{\bm{\mu}}\!\left\{
-            \phi_{j,\lambda_2}\!\left(\bm{\mu}\right)
+            \phi_{j,\lambda_2}\!\left[\bm{\mu}\right]
         \right\}\!\left(\bm{r}\right)
 \end{align}
 This is \emph{significantly} more compact: we only need to accumulate weighted products of the Fourier transforms of the input image PSFs:
@@ -358,12 +384,13 @@ This is \emph{significantly} more compact: we only need to accumulate weighted p
     \mathcal{F}_{\bm{\mu},\bm{\nu}}\!\left\{
         \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
     \right\}\!\left(\bm{r},\bm{s}\right)
-    =&
+    =&\;
     \delta\!\left(\bm{r}-\bm{s}\right)
+    |F^+|
     \sum_j
         \frac{
             \tau_{j,\lambda_1}
-            \tau_{j,\lambda_2}
+            \tau_{j,\lambda_2}\
         }{
             V_j \; |A_j|
         }
@@ -377,7 +404,8 @@ This is \emph{significantly} more compact: we only need to accumulate weighted p
         \right\}\!\left(\bm{r}\right)
     \\
     \widetilde{\Phi}_{\lambda_1,\lambda_2}(\bm{r})
-    \equiv &
+    \equiv &\;
+    |F^+|
     \sum_j
         \frac{
             \tau_{j,\lambda_1}
@@ -448,7 +476,7 @@ We can expand this in the same manner as the original likelihood to relate the t
         \bar{C}^{-1}_{\lambda_1,\lambda_2}
         \sum_{\bm{\eta}}
         \bar{z}_{\lambda_2}[\bm{\eta}]
-        \; \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\mu}]
+        \; \bar{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
     \Bigg]
 \nonumber\\
 &+
@@ -477,8 +505,8 @@ Grouping by factors of $f_{\lambda}(\bm{\mu})$, we can again identify the terms 
         \sum_{\lambda_2}
         \bar{C}_{\lambda_1,\lambda_2}^{-1}
         \sum_{\eta}
-        \bar{z}_{\lambda_1}[\bm{\eta}]
-        \; \bar{\phi}_{\lambda_2}[\bm{\eta}-\bm{\mu}]
+        \bar{z}_{\lambda_2}[\bm{\eta}]
+        \; \bar{\phi}_{\lambda_1}[\bm{\eta}-\bm{\mu}]
     \label{eqn:psi-factorization}
     \\
     \Phi_{\lambda_1,\lambda_2}[\bm{\mu}, \bm{\nu}] = &\;
@@ -531,9 +559,11 @@ Because we are expecting to accumulate $\Phi$ in Fourier space, we will start ou
         \bm{s}
     \right]
     \sum_{\bm{\eta}}
-    e^{-2\pi i \bm{\eta}\cdot(\bm{r}-\bm{s})}
+    e^{-\frac{2\pi i}{|F^+|} \bm{\eta}\cdot(\bm{r}-\bm{s})}
 \\
 =&\;
+    |F^+|
+    \;
     \bar{C}^{-1}_{\lambda_1,\lambda_2}
     \;
     \mathcal{F}^*_{\bm{\mu}}\!\left\{
@@ -551,10 +581,12 @@ Because we are expecting to accumulate $\Phi$ in Fourier space, we will start ou
     \delta(\bm{r}-\bm{s})
 \end{align}
 The presence of a delta function on the right-hand side validates our previous assumption that the coadd pixel noise is uncorrelated within wavelength bins.
-We can now drop them from both sides:
+We can now drop the delta functions from both sides:
 \begin{align}
     \widetilde{\Phi}_{\lambda_1,\lambda_2}[\bm{r}]
 = & \;
+    |F^+|
+    \;
     \bar{C}^{-1}_{\lambda_1,\lambda_2}
     \;
     \mathcal{F}^*_{\bm{\mu}}\!\left\{
@@ -609,6 +641,9 @@ We can use this to obtain $\bar{\phi}$ and $\bar{C}^{-1}$ with the following pro
     \end{align}
 \end{itemize}
 
+%% TODO: next equations incorrect because \lambda_1 and \lambda_2 are transposed
+
+
 To obtain $\bar{z}_{\lambda}[\bm{\mu}]$, we examine the Fourier transform of $\Psi_{\lambda}[\bm{\mu}]$:
 \begin{align}
     \mathcal{F}_{\bm{\mu}}\!\left\{
@@ -640,9 +675,11 @@ To obtain $\bar{z}_{\lambda}[\bm{\mu}]$, we examine the Fourier transform of $\P
         \sum_{\eta}
         \bar{z}_{\lambda_1}[\bm{\eta}]
         \;
-        e^{-2\pi i \bm{\eta}\cdot\bm{r}}
+        e^{-\frac{2\pi i}{|F^+|} \bm{\eta}\cdot\bm{r}}
     \\
     = & \;
+        |F^+|
+        \;
         \mathcal{F}_{\bm{\mu}}\!\left\{
             \bar{z}_{\lambda_1}[\bm{\mu}]
         \right\}\!\left[
@@ -670,6 +707,7 @@ Rearranging, we have:
                 \bm{r}
             \right]
         }{
+            |F^+|
             \sum\limits_{\lambda_2}
             \bar{C}_{\lambda_1,\lambda_2}^{-1}
             \;
@@ -690,9 +728,383 @@ Together, Eqns.~\ref{eqn:solution-diagonal-psfs}, \ref{eqn:solution-offdiagonal-
     \item the noise on all input images is stationary and uncorrelated;
     \item no input images have missing pixels.
 \end{itemize}
-We will address both limitations in the next section.
+We will address these limitations in the next sections.
 
 \section{Realistic Noise}
+
+Once the coadd PSFd $\bar{\phi}$ and covarianced $\bar{C}_i$ have been determined, the actual operations performed on the input images are linear.
+We could, in theory, write the coaddition process described in the previous section as a matrix product:
+\begin{align}
+    \bar{z}_{\lambda}[\bm{\mu}]
+    =&\;
+    \sum_j \sum_{\bm{x}_j}
+    T_{\lambda,j}[\bm{\mu},\bm{x}_j]
+    \;
+    z_j[\bm{x}_j]
+\end{align}
+Given $\bm{T}$, we could straightforwardly propagate \emph{any} set of true input image noise covariances $\left\{\bm{U}_j\right\}$ to compute the true coadd noise covariance matrix $\bar{U}$:
+\begin{align}
+    \bar{U}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    =&\;
+    \sum_j \sum_{\bm{x}_j,\bm{y}_j}
+    T_{\lambda_1,j}[\bm{\mu},\bm{x}_j]
+    \,
+    T_{\lambda_2,j}[\bm{\nu},\bm{y}_j]
+    \,
+    U_j[\bm{x}_j,\bm{y}_j]
+\end{align}
+$\bm{T}$ has $\bm{W} \times |F|$ rows and $\sum\limits_j|E_j|$ columns, making it much too large to compute in full, but it will be useful to have an expression for its elements.
+We can derive this by inserting Eqn.~\ref{eqn:psi-accumulated} into Eqn.~\ref{eqn:solution-image}:
+\begin{align}
+    \bar{z}_{\lambda_1}[\bm{\mu}]
+    =&\;
+    \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+        \frac{
+            \mathcal{F}_{\bm{\eta}}\!\left\{
+            \sum\limits_{j}
+            \frac{\tau_{j,\lambda_1}}{V_j}
+            \sum\limits_{\bm{x}_j}
+            \phi_{j,\lambda_1}\!\left(
+                \bm{A}_j(\bm{x}_j) - \bm{\eta}
+            \right)
+            \right\}\!\left[
+                \bm{r}
+            \right]
+            \,
+            z_j[\bm{x}_j]
+        }{
+            |F^+|
+            \sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\eta}}\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\eta}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+    \right\}\!\left[
+        \bm{\mu}
+    \right]
+    \,
+    \\
+    =&\;
+    \sum_{j}
+    \frac{\tau_{j,\lambda_1}}{V_j}
+    \sum_{\bm{x}_j}
+    \,
+    \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+        \frac{
+            \mathcal{F}_{\bm{\eta}}\!\!\left\{
+            \phi^*_{j,\lambda_1}\!\left[
+                \bm{\eta}
+            \right]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }{
+            |F^+|
+            \sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\mu}}\!\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\eta}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        \,
+        e^{-2\pi i\,\bm{r}\cdot\bm{A}_j(\bm{x}_j)}
+    \right\}\!\left[
+        \bm{\mu}
+    \right]
+    \,
+    z_j[\bm{x}_j]
+    \\
+    T_{\lambda_1,j}[\bm{\mu},\bm{x}_j]
+    =&\;
+    \frac{\tau_{j,\lambda_1}}{V_j}
+    \,
+    \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+        \frac{
+            \mathcal{F}_{\bm{\eta}}\!\left\{
+            \phi^*_{j,\lambda_1}\!\left[
+                \bm{\eta}
+            \right]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }{
+            |F^+|
+            \sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\eta}}\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\eta}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        \,
+        e^{-2\pi i\,\bm{r}\cdot\bm{A}_j(\bm{x}_j)}
+    \right\}\!\left[
+        \bm{\mu}
+    \right]
+\end{align}
+
+If the input image covariance matrices are dense, we have no choice but to compute all of the elements of $\bm{T}$ (though we only need keep the elements for one input image in memory at a time).
+
+Typically, however, astronomical images have noise that is uncorrelated or nearly uncorrelated, so we will assume a noise model of the form
+\begin{align}
+    U_j[\bm{x}_j,\bm{y}_j]
+    =&\;
+    V_j\,\delta_[\bm{x}_j,\bm{y}_j]
+    +
+    \!\!\!\!
+    \sum_{\bm{p}_j}^{||p_j|| \le R}
+    \!\!
+    H_j[\bm{x}_j, \bm{p}_j]
+    \;
+    \delta[\bm{p}_j+\bm{x}_j-\bm{y}_j]
+\end{align}
+with $R$ typically much less than the size of a cell.
+
+\begin{align}
+    \bar{U}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    =&\;
+    \sum_j \sum_{\bm{x}_j,\bm{y}_j}
+    T_{\lambda_1,j}[\bm{\mu},\bm{x}_j]
+    \,
+    T_{\lambda_2,j}[\bm{\nu},\bm{y}_j]
+    \,
+    V_j\,\delta_[\bm{x}_j,\bm{y}_j]
+    \\
+    &\quad+
+    \sum_j \sum_{\bm{x}_j,\bm{y}_j}
+    T_{\lambda_1,j}[\bm{\mu},\bm{x}_j]
+    \,
+    T_{\lambda_2,j}[\bm{\nu},\bm{y}_j]
+    \sum_{\bm{p}_j}^{||p_j|| \le R}
+    \!\!
+    H_j[\bm{x}_j, \bm{p}_j]
+    \;
+    \delta[\bm{p}_j+\bm{x}_j-\bm{y}_j]
+    \\
+    =&\;
+    \bar{C}_{\lambda_1,\lambda_2}
+    \,
+    \delta[\bm{\mu}-\bm{\nu}]
+    +
+    \sum_j \sum_{\bm{x}_j}
+    \!\!\!\!
+    \sum_{\bm{p}_j}^{||p_j|| \le R}
+    \!\!
+    T_{\lambda_1,j}[\bm{\mu},\bm{x}_j]
+    \;
+    T_{\lambda_2,j}[\bm{\nu},\bm{x}_j+\bm{p_j}]
+    \;
+    H_j[\bm{x}_j, \bm{p}_j]
+    \\
+    =&\;
+    \bar{C}_{\lambda_1,\lambda_2}
+    \,
+    \delta[\bm{\mu}-\bm{\nu}]
+    +
+    \bar{H}_{\lambda_1,\lambda_2}[\bm{\mu}, \bm{\nu}]
+\end{align}
+
+\begin{align}
+    \bar{H}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    =&\;
+    \sum_j \sum_{\bm{x}_j}
+    \!\!\!\!
+    \sum_{\bm{p}_j}^{||p_j|| \le R}
+    \!\!
+    \left(
+        \frac{\tau_{j,\lambda_1}}{V_j}
+        \,
+        \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+            \frac{
+                \mathcal{F}_{\bm{\eta}}\!\left\{
+                \phi^*_{j,\lambda_1}\!\left[
+                    \bm{\eta}
+                \right]
+                \right\}\!\left[
+                    \bm{r}
+                \right]
+            }{
+                |F^+|
+                \sum\limits_{\lambda_3}
+                \bar{C}_{\lambda_1,\lambda_3}^{-1}
+                \;
+                \mathcal{F}_{\bm{\eta}}\!\left\{
+                    \bar{\phi}^*_{\lambda_3}[\bm{\eta}]
+                \right\}\!\left[
+                    \bm{r}
+                \right]
+            }
+            \,
+            e^{-\frac{2\pi i}{|F^+|}\bm{r}\cdot\bm{A}_j(\bm{x}_j)}
+        \right\}\!\left[
+            \bm{\mu}
+        \right]
+    \right)
+    \\
+    &\qquad\times
+    \left(
+        \frac{\tau_{j,\lambda_2}}{V_j}
+        \,
+        \mathcal{F}^{-1}_{\bm{s}}\!\left\{
+            \frac{
+                \mathcal{F}_{\bm{\zeta}}\!\left\{
+                \phi^*_{j,\lambda_2}\!\left[
+                    \bm{\zeta}
+                \right]
+                \right\}\!\left[
+                    \bm{s}
+                \right]
+            }{
+                |F^+|
+                \sum\limits_{\lambda_4}
+                \bar{C}_{\lambda_2,\lambda_4}^{-1}
+                \;
+                \mathcal{F}_{\bm{\zeta}}\!\left\{
+                    \bar{\phi}^*_{\lambda_4}[\bm{\zeta}]
+                \right\}\!\left[
+                    \bm{s}
+                \right]
+            }
+            \,
+            e^{-\frac{2\pi i}{|F^+|}\bm{s}\cdot\bm{A}_j(\bm{x}_j+\bm{p}_j)}
+        \right\}\!\left[
+            \bm{\nu}
+        \right]
+    \right)
+    \,
+    H_j[\bm{x}_j, \bm{p}_j]
+\end{align}
+
+\begin{align}
+    \bar{H}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    =&\;
+    \sum_j
+    \frac{\tau_{j,\lambda_1}\tau_{j,\lambda_2}}{V_j^2}
+    \sum_{\bm{x}_j}
+    \!\!\!\!
+    \sum_{\bm{p}_j}^{||p_j|| \le R}
+    \!\!
+        \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+            \frac{
+                \mathcal{F}_{\bm{\eta}}\!\left\{
+                \phi^*_{j,\lambda_1}\!\left[
+                    \bm{\eta}
+                \right]
+                \right\}\!\left[
+                    \bm{r}
+                \right]
+            }{
+                \sum\limits_{\lambda_3}
+                \bar{C}_{\lambda_1,\lambda_3}^{-1}
+                \;
+                \mathcal{F}_{\bm{\eta}}\!\left\{
+                    \bar{\phi}^*_{\lambda_3}[\bm{\eta}]
+                \right\}\!\left[
+                    \bm{r}
+                \right]
+            }
+            \,
+            e^{-\frac{2\pi i}{|F^+|}\bm{r}\cdot\bm{A}_j(\bm{x}_j)}
+        \right\}\!\left[
+            \bm{\mu}
+        \right]
+    \\
+    &\qquad\times
+        \,
+        \mathcal{F}^{-1}_{\bm{s}}\!\left\{
+            \frac{
+                \mathcal{F}_{\bm{\zeta}}\!\left\{
+                \phi^*_{j,\lambda_2}\!\left[
+                    \bm{\zeta}
+                \right]
+                \right\}\!\left[
+                    \bm{s}
+                \right]
+            }{
+                \sum\limits_{\lambda_4}
+                \bar{C}_{\lambda_2,\lambda_4}^{-1}
+                \;
+                \mathcal{F}_{\bm{\zeta}}\!\left\{
+                    \bar{\phi}^*_{\lambda_4}[\bm{\zeta}]
+                \right\}\!\left[
+                    \bm{s}
+                \right]
+            }
+            \,
+            e^{-\frac{2\pi i}{|F^+|}\bm{s}\cdot\bm{A}_j(\bm{x}_j+\bm{p}_j)}
+        \right\}\!\left[
+            \bm{\nu}
+        \right]
+    \,
+    H_j[\bm{x}_j, \bm{p}_j]
+\end{align}
+
+\begin{align}
+    \bar{H}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    =&\;
+    \sum_j
+    \frac{\tau_{j,\lambda_1}\tau_{j,\lambda_2}}{V_j^2|F^+|^2}
+    \!\!\!
+    \sum_{\bm{p}_j}^{||p_j|| \le R}
+    \!\!
+    \sum_{\bm{r},\bm{s}}
+        \frac{
+            \mathcal{F}_{\bm{\eta}}\!\left\{
+            \phi^*_{j,\lambda_1}\!\left[
+                \bm{\eta}
+            \right]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }{
+            \sum\limits_{\lambda_3}
+            \bar{C}_{\lambda_1,\lambda_3}^{-1}
+            \;
+            \mathcal{F}_{\bm{\eta}}\!\left\{
+                \bar{\phi}^*_{\lambda_3}[\bm{\eta}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        \,
+        \frac{
+            \mathcal{F}_{\bm{\zeta}}\!\left\{
+            \phi^*_{j,\lambda_2}\!\left[
+                \bm{\zeta}
+            \right]
+            \right\}\!\left[
+                \bm{s}
+            \right]
+        }{
+            \sum\limits_{\lambda_4}
+            \bar{C}_{\lambda_2,\lambda_4}^{-1}
+            \;
+            \mathcal{F}_{\bm{\zeta}}\!\left\{
+                \bar{\phi}^*_{\lambda_4}[\bm{\zeta}]
+            \right\}\!\left[
+                \bm{s}
+            \right]
+        }
+    \\
+    &\quad\times
+        \sum_{\bm{x}_j}
+        e^{
+            -\frac{2\pi i}{|F^+|}\bm{r}\cdot[\bm{A}_j(\bm{x}_j)-\bm{\eta}]
+            -\frac{2\pi i}{|F^+|}\bm{s}\cdot[\bm{A}_j(\bm{x}_j)+\bm{A}_k(\bm{p}_j)-\bm{\zeta}]
+        }
+    \,
+    H_j[\bm{x}_j, \bm{p}_j]
+\end{align}
+
 
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies

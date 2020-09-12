@@ -1,0 +1,314 @@
+\documentclass{amsart}
+
+\begin{document}
+
+Kaiser Coadds, including w/o resampling
+
+\begin{align}
+\widetilde{\Psi}[r] =
+\sum_{j=0}^{j<N}
+\frac{\tau_j}{V_j}
+\,
+\widetilde{z}_j[r]
+\,
+\widetilde{\phi}_j[r]
+\end{align}
+
+\begin{align}
+\widetilde{\Phi}[r]
+=
+\sum_{j=0}^{j<N}
+\frac{\tau_j^2}{V_j}
+\,
+\left|
+\widetilde{\phi}_j[r]
+\right|^2
+\end{align}
+
+\begin{align}
+\Psi[\mu] =
+\sum_{j=0}^{j<N}
+\frac{\tau_j}{V_j}
+\sum_{x_j \in E_j}
+z_j[x_j]
+\,
+\phi_j(A_j(x_j) - \mu)
+\end{align}
+
+\begin{align}
+V_C = \left[
+  \sum_{r \in \widetilde{C}}
+  \sqrt{\widetilde{\Phi}[r]}
+\right]^{-2}
+\end{align}
+
+\begin{align}
+\widetilde{\phi}_C[r] =
+\sqrt{V_C \, \widetilde{\Phi}[r]}
+\end{align}
+
+\begin{align}
+\widetilde{z}_C[r] =
+\frac{
+  V_C \, \widetilde{\Psi}[r]
+}{
+  \widetilde{\phi}_C[r]
+}
+\end{align}
+
+\begin{align}
+\widetilde{K}_j[r] =
+\frac{
+  \widetilde{\phi}_j[r]
+}{
+  \widetilde{\phi}_C[r]
+}
+\end{align}
+
+\begin{align}
+z_C[\mu] = \sum_{j=0}^{j<N}
+  \frac{\tau_j\,V_C}{V_j}
+  \sum_{\eta \in C}
+  K_j[\mu - \eta]
+  \,
+  z_j[\eta]
+\end{align}
+
+
+Sub-band Kaiser coadds
+
+\begin{align}
+\Psi_{\lambda}[\mu] =
+    \sum_{j=0}^{j < N}
+    \frac{\tau_{j,\lambda}}{V_j}
+    \sum_{x_j \in E_j}
+    z_j[x_j]
+    \; \phi_{j,\lambda}\!\left(
+        A_j(x_j) - \mu
+    \right)
+\end{align}
+
+\begin{align}
+\widetilde{\Phi}_{\lambda_1,\lambda_2}[r] =
+    \sum_{j}
+    \frac{
+        \tau_{j,\lambda_1}
+        \tau_{j,\lambda_2}
+    }{
+        V_j
+    }
+    \sum_{x_j}
+    \widetilde{\phi}^*_{j,\lambda_1}\!(r)
+    \;
+    \widetilde{\phi}_{j,\lambda_2}\!(r)
+\end{align}
+
+\begin{align}
+F_{\lambda,\lambda} =
+\left[\sum_{r \in \widetilde{C}}
+    \sqrt{\widetilde{\Phi}_{\lambda,\lambda}[r]}
+\right]^2
+\end{align}
+
+
+\begin{align}
+\widetilde{\phi}_{C,\lambda}[r] =
+\sqrt{
+    \frac{
+        \widetilde{\Phi}_{\lambda,\lambda}[r]
+    } {
+        F_{\lambda,\lambda}
+    }
+}
+\end{align}
+
+\begin{align}
+    F_{\lambda_1,\lambda_2}
+    =
+    \frac{
+        \widetilde{\Phi}_{\lambda_1,\lambda_2}[r]
+    }{
+        \widetilde{\phi}^*_{C,\lambda_1}[r]
+        \;
+        \widetilde{\phi}_{C,\lambda_2}[r]
+    }
+\end{align}
+
+\begin{align}
+\widetilde{z}_{C,\lambda_1}[r]
+= \sum_{\lambda_2}
+F^{-1}_{\lambda_1,\lambda_2}
+\frac{
+    \widetilde{\Psi}_{\lambda_2}[r]
+}{
+    \widetilde{\phi}^*_{C,\lambda_2}[r]
+}
+\end{align}
+
+
+Bad pixel interpolation
+
+\begin{align}
+\Psi[\mu] =
+\sum_{j=0}^{j<N}
+\frac{\tau_j}{V_j}
+\sum_{x_j \in {G}_j}
+z_j[x_j]
+\;
+\phi_{j}\!\left( A_j(x_j) - \mu \right)
+\end{align}
+
+\begin{align}
+\Phi[\mu,\nu] =
+\sum_{j=0}^{j<N}
+\frac{\tau_j^2}{V_j}
+\left[
+\sum_{x_j \in {G}_j \cup {B}_j}
+\phi_{j}\!\left( A_j(x_j) - \mu \right)
+\,
+\phi_{j}\!\left( A_j(x_j) - \nu \right)
+\right.
+\\
+\quad\quad
+\left.
+-
+\sum_{x_j \in {B}_j}
+\phi_{j}\!\left( A_j(x_j) - \mu \right)
+\,
+\phi_{j}\!\left( A_j(x_j) - \nu \right)
+\right]
+\end{align}
+
+\begin{align}
+\widetilde{\Phi}[r, s]
+=
+\widetilde{\phi}^*_C[r]
+\,
+\widetilde{H}[r,s]
+\,
+\widetilde{\phi}_C[s]
+\end{align}
+\begin{align}
+H[\mu,\nu]
+= \frac{\delta[\mu-\nu]}{V_C} -
+\sum_{j=0}^{j<N}
+\frac{\tau_j^2}{V_j}
+\sum_{x_j \in {B}_j}
+K_{j}\!\left( A_j(x_j) - \mu \right)
+\,
+K_{j}\!\left( A_j(x_j) - \nu \right)
+\end{align}
+
+\begin{align}
+\Psi[\mu] =
+\sum_{\eta \in C}
+\sum_{\nu \in C}
+\phi_C[\eta - \mu]
+\,
+H[\eta,\nu]
+\,
+z_C[\nu]
+\end{align}
+
+\begin{align}
+y[\mu]
+=
+\sum_{\nu \in C}
+H[\mu,\nu]
+\,
+z_C[\nu]
+\end{align}
+
+\begin{align}
+\mathbf{y}
+= (\mathbf{V}_C^{-1} - \mathbf{R})
+\mathbf{z}_C
+\end{align}
+
+\begin{align}
+\widetilde{y}[r]
+=
+\frac{\widetilde{\Psi}[r]}{\widetilde{\phi}_C[r]}
+\end{align}
+
+\begin{align}
+\mathbf{z}_C^{(k+1)}
+=\mathbf{V}_C \left(
+    \mathbf{y}
+  + \mathbf{R}
+  \,\mathbf{z}_C^{(k)}\right)
+\end{align}
+
+\begin{align}
+\sum_{\nu \in C}
+R[\mu,\nu] \, z_C[\nu]
+=
+\sum_{j=0}^{j<N}
+\sum_{x_j \in {B}_j}
+\frac{\tau_j^2}{V_j}
+K_{j}\!\left( A_j(x_j) - \mu \right)
+\sum_{\nu \in C}
+\,
+K_{j}\!\left( A_j(x_j) - \nu \right)
+z_C[\nu]
+\end{align}
+
+Crazier Ideas
+
+\begin{align}
+Q = -\ln \! \int e^{-L(f)}  P(f) \, df
+\end{align}
+\begin{align}
+\approx -\ln \! \int e^{-L(f)} \, df
+= \frac{1}{2}\left(
+    \kappa
+  + \ln\left| \frac{\mathbf{\Phi}}{2\pi} \right|
+  - \mathbf{\Psi}^T
+    \mathbf{\Phi}^{-1}
+    \mathbf{\Psi}
+\right)
+\end{align}
+
+PSF Tweaks
+
+\begin{align}
+L \equiv
+\frac{1}{2} \sum_{j=0}^{j<N}
+\frac{1}{V_j}
+\sum_{x_j \in {E}_j}
+\left(
+    z_j[x_j]
+  - \tau_{j}
+    \sum_{\nu \in C}
+    \Bigl[
+    \phi_{j}\!\left(
+        A_j(x_j) - \nu
+    \right)
+    +\delta_{j,k}\Delta(A_j(x_j) - \nu)
+    \Bigr]
+    f(\nu)
+\right)^2
+\end{align}
+
+Background Matching:
+
+\begin{align}
+L \equiv
+\frac{1}{2} \sum_{j=0}^{j<N}
+\frac{1}{V_j}
+\sum_{x_j \in {E}_j}
+\left(
+    z_j[x_j]
+  - \tau_{j}
+    b_j
+  - \tau_{j}
+    \sum_{\nu \in C}
+    \phi_{j}\!\left(
+        A_j(x_j) - \nu
+    \right)
+    f(\nu)
+\right)^2
++ \Lambda\left(\sum_{j=0}^{j<N}\tau_j b_j\right)^2
+\end{align}
+
+\end{document}
