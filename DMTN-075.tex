@@ -17,7 +17,8 @@
 % \setDocSubtitle{A subtitle}
 
 \author{%
-Jim Bosch
+Jim Bosch, \\
+Arun Kannawadi
 }
 
 \setDocRef{DMTN-075}
@@ -725,10 +726,127 @@ Rearranging, we have:
 
 Together, Eqns.~\ref{eqn:solution-diagonal-psfs}, \ref{eqn:solution-offdiagonal-covariances}, and \ref{eqn:solution-image} constitute a complete solution to Eqns.~\ref{eqn:psi-factorization} and \ref{eqn:phi-factorization}, and hence a complete prescription for building a coadd that is a sufficient statistic for the input data when:
 \begin{itemize}
+    \item the PSF is known to arbitrary accuracy;
     \item the noise on all input images is stationary and uncorrelated;
     \item no input images have missing pixels.
 \end{itemize}
 We will address these limitations in the next sections.
+
+\section{PSF estimation errors}
+
+In the previous section, we assumed we have complete knowledge of the PSF and did not distinguish between the true PSF and the model PSF. While the Fourier-space is computationally simpler, the real-space is conceptually simpler.
+
+The log-likelihood is
+\begin{align}
+    L =&
+        \frac{\kappa}{2}
+    -
+        \sum_{\lambda}
+        \sum_{\bm{\mu}}
+        f_{\lambda}(\bm{\mu})
+        \;\Psi_{\lambda}[\bm{\mu}]
+    +
+        \frac{1}{2}
+        \sum_{\lambda_1,\lambda_2}
+        \sum_{\bm{\mu},\bm{\nu}}
+        f_{\lambda_1}(\bm{\mu}) \;
+        f_{\lambda_2}(\bm{\nu}) \;
+        \Phi_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \end{align}
+    
+    The best estimate for the smoothed scene is
+    \begin{align}
+        f_{\lambda}(\bm{\mu}) = {\Phi_{\lambda_1,\lambda_2}^{-1}[\bm{\mu}, \bm{\nu}]} \Psi_{\lambda}[\bm{\nu}]
+    \end{align}
+
+Denoting the estimated PSF as $\hat{\phi}$, 
+\begin{align}
+    \hat{\Psi}_{\lambda}[\bm{\mu}] \equiv &
+        \sum_{j}
+        \frac{\tau_{j,\lambda}}{V_j}
+        \sum_{\bm{x}_j}
+            \; z_j[\bm{x}_j]
+            \; \hat{\phi}_{j,\lambda}\!\left(
+                \bm{A}_j(\bm{x}_j) - \bm{\mu}
+            \right)
+        \equiv \sum_{j} \hat{\Psi}_{j,\lambda}[\bm{\mu}]
+    \label{eqn:psihat-accumulated}
+    \\
+    \hat{\Phi}_{\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}] \equiv &
+        \sum_{j}
+        \frac{
+            \tau_{j,\lambda_1}
+            \tau_{j,\lambda_2}
+        }{
+            V_j
+        }
+        \sum_{\bm{x}_j}
+            \hat{\phi}_{j,\lambda_1}\!\left(
+                \bm{A}(\bm{x}_j) - \bm{\mu}
+            \right)
+            \; \hat{\phi}_{j,\lambda_2}\!\left(
+                \bm{A}(\bm{x}_j) - \bm{\nu}
+            \right)
+    \equiv \sum_{j} \hat{\Phi}_{j,\lambda_1,\lambda_2}[\bm{\mu},\bm{\nu}]
+    \label{eqn:phihat-accumulated}
+\end{align}
+
+Taking differential to propagate errors to first order,
+\begin{align}
+    \delta\bar{z}_{\lambda_1}[\bm{\mu}]
+    =&\;
+    \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+        \frac{
+            \mathcal{F}_{\bm{\mu}}\!\left\{
+                \delta\Psi_{\lambda_1}(\bm{\mu})
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }{
+            |F^+|
+            \sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\mu}}\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\mu}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        \right\}\!\left[
+        \bm{\mu}
+    \right] -
+    \mathcal{F}^{-1}_{\bm{r}}\!\left\{
+        \mathcal{F}_{\bm{\mu}}\left\{\bar{z}_{\lambda_1}[\bm{\mu}]\right\}\left[
+            \bm{r}
+        \right]
+        \frac{
+            \delta\sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\mu}}\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\mu}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        {
+            \sum\limits_{\lambda_2}
+            \bar{C}_{\lambda_1,\lambda_2}^{-1}
+            \;
+            \mathcal{F}_{\bm{\mu}}\!\left\{
+                \bar{\phi}^*_{\lambda_2}[\bm{\mu}]
+            \right\}\!\left[
+                \bm{r}
+            \right]
+        }
+        \right\}\!\left[
+        \bm{\mu}
+    \right]
+    \label{eqn:solution-image-differential}
+\end{align}
+
+If the PSF errors at each pixel locations are random about zero, then the coadd pixel values will still be biased due to the second (and even order) terms in $\delta$.
 
 \section{Realistic Noise}
 
