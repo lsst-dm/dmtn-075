@@ -55,6 +55,206 @@ Design sketch and mathematics for a new approach to building coadds and constrai
 % Frequently for a technote we do not want a title page  uncomment this to remove the title page and changelog.
 % use \mkshorttitle to remove the extra pages
 
+\section{Likelihood Coadds}
+
+\subsection{Derivation and starting assumptions}
+
+We start by writing the log likelihood of an arbitrary model of the local sky, $α$, given multiple images $z_j$ with differing PSFs $ϕ$:
+\begin{align}
+    L \; ≡ \; &
+        \frac{1}{2}
+        \sum_j
+        \symbf{R}_j^T
+        \, \symbf{C}_j^{-1}
+        \, \symbf{R}_j
+\end{align}
+where the residual vectors\footnote{When we use matrix notation on image-like entities, we will invariably mean that the 2-d image is flattened into a 1-d vector.} $\symbf{R}_j$ are defined as
+\begin{align}
+    R_j[\symbf{x}_j] \; ≡ \; &
+        z_j[\symbf{x}_j]
+        - \int\!\!d^2\symbf{r}
+            \, ϕ_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j - \symbf{r}\right)
+            \, α(\symbf{r})
+    \label{eqn:residual-definition}
+\end{align}
+where $\symbf{r}$ are coordinates in the projection we will coadd onto, and $\symbf{A}_j$ and $\symbf{b}_j$ are the linear transform and translation that map input-image coordinates $\symbf{x}_j$ to $\symbf{r}$.
+Note that we define the PSF and model in coadd coordinates, not input-image coordinates.
+This likelihood is \emph{local} because we have assumed the PSF is not spatially varying and the transformation is affine -- a valid assumption in the neighborhood of any particular point, but not over larger scales.
+This is a common feature of the approaches to coaddition described here: we will explicitly subdivide the sky into small cells whose maximum extent is set by the scales on which these assumptions are valid.
+
+This likelihood is quite general in many respects:
+\begin{itemize}
+    \item the input pixel grid may or may not be well-sampled;
+    \item pixels on the same image may have arbitrary noise correlations;
+    \item pixels with no data or artifacts can simply be omitted from the sum,
+    provided they can be identified.
+\end{itemize}
+We will need to place restrictions on these to make the method computationally tractable in later steps.
+In other respects, we have made powerful simplifying assumptions:
+\begin{itemize}
+    \item all images have been background subtracted in advance;
+    \item the true sky is completely static ($α$ is the same for every epoch);
+    \item there is no wavelength dependence at all - so either the true sky is monochromatic, or all PSFs have the same throughput as a function of wavelength, so all wavelength dependency cancels.
+\end{itemize}
+We will relax each of these assumptions in later sections.
+
+We now expand the quadratic log likelihood and group by powers of $α$:
+
+\begin{align}
+    L &= \frac{\kappa}{2} - \int\!\!d^2\symbf{r} \, \Psi(\symbf{r}) \, α(\symbf{r})
+        +\frac{1}{2}\int\!\!d^2\symbf{r} \! \int\!\!d^2\symbf{s}
+            \, \Phi(\symbf{r}, \symbf{s}) \, α(\symbf{r}) \, α(\symbf{s})
+\end{align}
+with
+\begin{align}
+    \kappa_c &\equiv \sum_j \kappa_j
+        \equiv \sum_j \sum_{\symbf{x}_j} \sum_{\symbf{y}_j}
+        C_j^{-1}[\symbf{x}_j, \symbf{y}_j] \; z_j[\symbf{x}_j] \, z_j[\symbf{y}_j] \\
+    \Psi_c(\symbf{r}) &\equiv \sum_j \Psi(\symbf{r})
+        \equiv \sum_j \sum_{\symbf{x}_j} \sum_{\symbf{y}_j}
+        C_j^{-1}[\symbf{x}_j, \symbf{y}_j] \; z_j[\symbf{x}_j] \,
+        ϕ_j\!\left(\symbf{A}_j\symbf{y}_j + \symbf{b}_j - \symbf{r}\right) \\
+    \Phi_c(\symbf{r}, \symbf{s}) &\equiv \sum_j \Phi(\symbf{r}, \symbf{s})
+        \equiv \sum_j \sum_{\symbf{x}_j} \sum_{\symbf{y}_j}
+        C_j^{-1}[\symbf{x}_j, \symbf{y}_j] \;
+        ϕ_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j - \symbf{r}\right) \,
+        ϕ_j\!\left(\symbf{A}_j\symbf{y}_j + \symbf{b}_j - \symbf{s}\right) \\
+\end{align}
+
+$\Psi_c$ and $\Phi_c$ are sufficient statistics for our model ($\kappa_c$ does not constrain the model; it enters only if one is interested in the Bayesian evidence or other goodness-of-fit measures), and they include all sums over input images.
+But as continuous functions, we can't consider them a coadd, let alone a practical one.
+
+If we choose our output grid such that all input PSFs are well sampled, however, we can replace
+\begin{align}
+    ϕ_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j - \symbf{r}\right) = &
+        \sum_{\symbf{p}} ϕ_j\!\left(\symbf{A}_j\symbf{x} + \symbf{b}_j - \symbf{p}\right)
+            \, \sinc^2(\symbf{p} - \symbf{r})
+\end{align}
+and obtain
+\begin{align}
+    \Psi_c(\symbf{r}) &= \sum_{\symbf{p}} \Psi_c(\symbf{p}) \, \sinc^2(\symbf{r} - \symbf{p}) \\
+    \Phi_c(\symbf{r}, \symbf{s}) &= \sum_{\symbf{p}} \sum_{\symbf{q}} \Phi_c(\symbf{p}, \symbf{q})
+        \, \sinc^2(\symbf{r} - \symbf{p})
+        \, \sinc^2(\symbf{s} - \symbf{q})
+\end{align}
+i.e. $\Psi_c$ and $\Phi_c$ are guaranteed to be well-sampled as well, even if the input pixel grids are not.
+We are still quite far from a practical coadd, however; we want an image as well as a PSF and/or covariance matrix that enter into the likelihood in essentially the same way that a single input image does.
+That means we want to solve
+\begin{align}
+    \Psi(\symbf{r}) &= \sum_{\symbf{p}}\sum_{\symbf{q}} C^{-1}_c[\symbf{p}, \symbf{q}]
+        \, \phi_c[\symbf{r} - \symbf{p}] \, z_c[\symbf{q}] \label{eqn:brute-force-Psi}\\
+    \Phi(\symbf{r}, \symbf{s}) &= \sum_{\symbf{p}}\sum_{\symbf{q}} C^{-1}_c[\symbf{p}, \symbf{q}]
+        \, \phi_c[\symbf{r} - \symbf{p}] \, \phi_c[\symbf{s} - \symbf{q}]
+    \label{eqn:brute-force-Phi}
+\end{align}
+for $\phi_c$, $C_c$, and $z_c$.
+There is no single unique solution, and in fact no guarantee of any solution for completely general inputs.
+This approach is one limit of the \texttt{IMCOM} method of \citet{2011ApJ...741...46R}, which utilizes a weight function that minimizes S/N losses during coaddition along with errors in PSF reconstruction; when there is no S/N loss and the PSF reconstruction is exact, their solution satisfies [\ref{eqn:brute-force-Psi}] and [\ref{eqn:brute-force-Phi}], while providing diagnostics when no such solution is possible.
+\texttt{IMCOM} is also extremely computationally expensive, as is any method that relies on direct accumulation of a fully general $\Phi$.
+In this technical note, we will instead focus on methods that start with simplifying assumptions that are at least \emph{mostly} true, and then investigate ways to iteratively and incrementally deal with those assumptions being weakly violated.
+
+The first of these simplifying assumptions is that the input noise in each image is constant:\footnote{It should be possible to assume only that the noise is stationary, but the algebra is much more involved.}
+\begin{align}
+    C_j[\symbf{x}_j, \symbf{y}_j] \rightarrow \sigma_j^2 \, \delta[\symbf{x}_j-\symbf{y}_j]
+\end{align}
+A single-input contribution to $\Phi_c$ is then
+\begin{align}
+    \Phi_j(\symbf{r}, \symbf{s}) &= \frac{1}{\sigma_j^2} \sum_{\symbf{x}_j} \;
+        ϕ_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j - \symbf{r}\right) \,
+        ϕ_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j - \symbf{s}\right)
+\end{align}
+with Fourier transform
+\begin{align}
+    \widetilde{\Phi_j}(\symbf{u}, \symbf{v}) &= \frac{1}{\sigma_j^2}
+        \widetilde{\phi_j}(-\symbf{u}) \, \widetilde{\phi_j}(-\symbf{v}) \,
+        e^{-2\pi i \symbf{b}^T(\symbf{u}+\symbf{v})} \,
+        \sum_{\symbf{x}_j} \, e^{-2\pi i \symbf{x}_j^{T} \symbf{A}_j^T (\symbf{u} + \symbf{v})}
+\end{align}
+To simplify further, we'd like to be able to apply the Poisson summation formula to the sum over $\symbf{x}_j$, but we need to be careful about the summation limits; so far we've implicitly (and vaguely) summed over all input pixels relevant to a cell, excluding any completely missing pixels.
+To instead sum over $\mathbb{Z}^2$, we need the original sum in [\ref{eqn:residual-definition}] to truncate outside some finite region by defining both $z_j$ and $\alpha$ to be zero outside that region, and we need to assume there are no missing pixels for.
+Neighboring cells will necessarily define truncation inconsistently from each other, so we will also need to build the coadd for a cell with some padding, such that coadd pixels within the cell are (to good approximation) not affected by the truncation, and thus consistent with their neighbors.
+How much padding will depend on the details of the algorithm, and the degree to which we aim for compactness in the real domain vs. compactness in the Fourier domain.
+
+With these qualifications, $\widetilde{\Phi_j}$ becomes
+\begin{align}
+    \widetilde{\Phi_j}(\symbf{u}, \symbf{v}) &= \frac{1}{\sigma_j^2}
+        \widetilde{\phi_j}(-\symbf{u}) \, \widetilde{\phi_j}(-\symbf{v}) \,
+        e^{-2\pi i \symbf{b}^T(\symbf{u}+\symbf{v})} \!
+        \sum_{\symbf{k}_j \in \mathbb{Z}^2}
+            \delta\left(\symbf{k}_j - \symbf{A}_j^T (\symbf{u} + \symbf{v}) \right)
+\end{align}
+
+But $\phi_j$ is band-limited on the coadd pixel grid, so $\widetilde{\phi_j}$ is zero if $|\symbf{u}|_1 \ge \frac{1}{2}$ or $|\symbf{v}|_1 \ge \frac{1}{2}$, and we can assume $|\symbf{u} + \symbf{v}|_1 < 1$.
+Considering the case where $\symbf{A}_j$ is a uniform scaling for simplicity:
+\begin{itemize}
+    \item if $|A_j| < 1$, the coadd pixels are larger than the input pixels; only the $\symbf{k}_j = 0$ term in the sum survives (note that the input image then must be well-sampled, because the coadd is).
+    \item if $|A_j| > 1$, the coadd pixels are smaller than the input pixels, and other terms may survive only if $A_j$ is greater than twice the actual band limit of the PSF -- or, in other words, only if the input image is not well sampled.
+\end{itemize}
+
+Our final simplifying assumption is naturally that the input images are well-sampled; this yields
+\begin{align}
+    \widetilde{\Phi_j}(\symbf{u}, \symbf{v}) &= \frac{1}{\sigma_j^2}
+        \widetilde{\phi_j}(-\symbf{u}) \, \widetilde{\phi_j}(-\symbf{v}) \,
+        e^{-2\pi i \symbf{b}^T(\symbf{u}+\symbf{v})} \,
+        \delta\left(-\symbf{A}_j^T (\symbf{u} + \symbf{v}) \right) \\
+    &= \frac{1}{\sigma_j^2}
+        \left|\widetilde{\phi_j}(\symbf{u})\right|^2
+        \delta(\symbf{u} + \symbf{v})
+    =
+\end{align}
+If we then accumulate the contributions from each input image in the Fourier domain, the delta function factors out of the sum, and we can write
+\begin{align}
+    \widetilde{\Phi_c}(\symbf{u}, \symbf{v})
+        &= \delta(\symbf{u} + \symbf{v})
+            \sum_j \frac{1}{\sigma_j^2} \left|\widetilde{\phi_j}(\symbf{u})\right|^2
+        = \delta(\symbf{u} + \symbf{v})
+            \frac{1}{\sigma_c^2} \left|\widetilde{\phi_c}(\symbf{u})\right|^2
+\end{align}
+This is essentially the continuous Fourier version of [\ref{eqn:brute-force-Phi}], but here the solution is trivial, and in many respects ideal:
+\begin{itemize}
+    \item the coadd PSF $\phi_c$ is the Fourier-domain square root of $\Phi_c$;
+    \item the noise in the coadd is also constant, and its standard deviation $\sigma_c$ can be derived as the constant the normalizes the coadd PSF $\phi_c$.
+\end{itemize}
+
+With these in hand, we can compute the coadd image $z_c$ from $\Psi_c$ (or rather their Fourier transforms):
+\begin{align}
+    \widetilde{z_c}(\symbf{u}) &= \frac{\widetilde{\Psi_c}(\symbf{u}) \, \sigma_c^2}{\widetilde{\phi_c}(\symbf{u})}
+\end{align}
+
+This simple result still hides a lot of complexity:
+\begin{itemize}
+    \item we have made extensive use of continuous Fourier transforms, which need to be computed via DFTs (with all of the attention to detail that implies) or reframed in terms of basis functions with analytic Fourier transforms;
+    \item we have at times assumed both that various kernels have finite-support in the image domain (e.g. in truncating the sums over input pixels) and in the Fourier domain (in assuming $\phi$ is strictly band-limited); but we can only approximately have both;
+    \item deconvolution of noisy images -- something this algorithm invariably requires -- is fraught with peril.
+\end{itemize}
+
+\subsection{Approximate PSFs}
+
+\section{Implementation options}
+
+\subsection{Resampling in advance}
+
+\subsubsection{Native-resolution DFT convolution and deconvolution}
+
+\subsubsection{Analytic single-kernel image-domain convolution}
+
+\subsection{Combining resampling and weights}
+
+\subsubsection{GALSIM-style Fourier-domain accumulation}
+
+\subsubsection{Analytic single-kernel image-domain resampling and weights}
+
+\section{Extensions for relaxed assumptions}
+
+\subsection{Nonstationary noise}
+
+\subsection{Undersampled input images}
+
+\subsection{Missing pixels}
+
+\subsection{Chromatic PSFs}
+
+
 \appendix
 % Include all the relevant bib files.
 % https://lsst-texmf.lsst.io/lsstdoc.html#bibliographies
