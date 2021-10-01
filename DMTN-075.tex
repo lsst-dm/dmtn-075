@@ -211,26 +211,73 @@ If we then accumulate the contributions from each input image in the Fourier dom
             \frac{1}{\sigma_c^2} \left|\widetilde{\phi_c}(\symbf{u})\right|^2
 \end{align}
 This is essentially the continuous Fourier version of [\ref{eqn:brute-force-Phi}], but here the solution is trivial, and in many respects ideal:
+\begin{align}
+    \widetilde{\phi_c}(\symbf{u}) &= \sigma_c \sqrt{\widetilde{\Phi_c}(\symbf{u}, \symbf{u})}
+        = \sigma_c \sqrt{\sum_j \frac{1}{\sigma_j^2} \left|\widetilde{\phi_j}(\symbf{u})\right|^2} \\
+    \frac{1}{\sigma_c} &= \int\!\!d^2\symbf{u} \, \sqrt{\sum_j \frac{1}{\sigma_j^2} \left|\widetilde{\phi_j}(\symbf{u})\right|^2}
+\end{align}
+Note that
 \begin{itemize}
     \item the coadd PSF $\phi_c$ is the Fourier-domain square root of $\Phi_c$;
     \item the noise in the coadd is also constant, and its standard deviation $\sigma_c$ can be derived as the constant the normalizes the coadd PSF $\phi_c$.
 \end{itemize}
 
-With these in hand, we can compute the coadd image $z_c$ from $\Psi_c$ (or rather their Fourier transforms):
+With these in hand, we can compute the Fourier-domain coadd image $z_c$ from the Fourier transform of $\Psi_c$:
 \begin{align}
-    \widetilde{z_c}(\symbf{u}) &= \frac{\widetilde{\Psi_c}(\symbf{u}) \, \sigma_c^2}{\widetilde{\phi_c}(\symbf{u})}
+    \widetilde{z_c}(\symbf{u})
+        &= \frac{\widetilde{\Psi_c}(\symbf{u}) \, \sigma_c^2}{\widetilde{\phi_c}(\symbf{u})}
+\end{align}
+Obtaining $\widetilde{\Psi_c}$ from $z_j$ and $\phi_j$ involves a continuous Fourier transform of either noisy, sampled data or something derived from it; a subtly difficult task.
+But it is also possible to reframe this as a linear operation in the image domain:
+\begin{align}
+    z_c(\symbf{r}) &= \sum_j \sum_{\symbf{x}_j} K_j\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right)
+        \, z_j[\symbf{x}_j] \label{eqn:image-domain-coadd} \\
+    \widetilde{K}_j(\symbf{u}) &\equiv
+        \frac{
+            \sigma_c^2 \, \widetilde{\phi_j^\ast}(\symbf{u})
+        }{
+            \sigma_j^2 \, \widetilde{\phi_c}(\symbf{u})
+        }
 \end{align}
 
-This simple result still hides a lot of complexity:
+This simple result still hides a lot of practical complexity, because $K$ is
 \begin{itemize}
-    \item we have made extensive use of continuous Fourier transforms, which need to be computed via DFTs (with all of the attention to detail that implies) or reframed in terms of basis functions with analytic Fourier transforms;
-    \item we have at times assumed both that various kernels have finite-support in the image domain (e.g. in truncating the sums over input pixels) and in the Fourier domain (in assuming $\phi$ is strictly band-limited); but we can only approximately have both;
-    \item deconvolution of noisy images -- something this algorithm invariably requires -- is fraught with peril.
+    \item generally not compact in the image domain;
+    \item potentially expensive to evaluate at the many non-integer points implied by \ref{eqn:image-domain-coadd}.
 \end{itemize}
+
+Overall, it is unclear whether we would be best served by approach that approximates the continuous Fourier transforms with DFTs (with all of the boundary-condition and folding issues that always entails) or one that works in the image domain, perhaps with analytic approximations or basis functions in the representation of $\phi$ that have analytic Fourier transforms.
+We will explore several possibilities in Section~\ref{sec:implementation-options}.
 
 \subsection{Approximate PSFs}
 
+In many case we may not want to use or may not be able to use the best available model of the PSF when building a coadd.
+Using an approximation formally breaks the property that the coadd is a sufficient statistic for the static sky, but the actual information loss could nevertheless be quite small (much smaller than the loss due to building naive direct coadds in all cases).
+In many of the implementation options we discuss later in Section~\ref{sec:implementation-options}, using an approximation with an analytic Fourier transform is required.
+In other cases:
+\begin{itemize}
+    \item The approximation may be more compact in the Fourier and/or image domain.
+    \item The approximation may be less affected by measurement noise or numerical instability, both of which can cause trouble with deconvolution operations.
+    \item The true PSF may be chromatic, so even our best model evaluated with some nomimal SED is only approximately right for other SEDs.
+    \item We may have already built the coadd with a PSF we now know to be subtly wrong, and want to understand systematic errors this may have introduced into later processing and/or update the coadd without starting over.
+\end{itemize}
+
+Because the coadd likelihood will no longer be exactly equivalent to the original joint single-epoch likelihood with this approximate, we will instead start with [\ref{eqn:image-domain-coadd}] as a prescription for building a coadd, but replace the true (or best-estimate) per-epoch PSFs $\phi_j$ with deliberate approximations $p_j$, and then derive the new effective coadd PSF.
+
+We start by fully expanding $\widetilde{K}$, but leaving the overall normalization (previously just $\sigma_c$) unknown as a parameter $s$:
+\begin{align}
+    \widetilde{K}_j(\symbf{u}) &\equiv
+        \frac{
+            s \, \widetilde{\phi_j^\ast}(\symbf{u})
+        }{
+            \sigma_j^2 \, \sqrt{\sum_j \left|\widetilde{\phi_j}(\symbf{u})\right|^2}
+        }
+\end{align}
+
+
 \section{Implementation options}
+
+\label{sec:implementation-options}
 
 \subsection{Resampling in advance}
 
