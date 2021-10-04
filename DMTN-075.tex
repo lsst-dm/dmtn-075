@@ -171,7 +171,7 @@ with Fourier transform
         \sum_{\symbf{x}_j} \, e^{-2\pi i \symbf{x}_j^{T} \symbf{A}_j^T (\symbf{u} + \symbf{v})}
 \end{align}
 To simplify further, we'd like to be able to apply the Poisson summation formula to the sum over $\symbf{x}_j$, but we need to be careful about the summation limits; so far we've implicitly (and vaguely) summed over all input pixels relevant to a cell, excluding any completely missing pixels.
-To instead sum over $\mathbb{Z}^2$, we need the original sum in [\ref{eqn:residual-definition}] to truncate outside some finite region by defining both $z_j$ and $\alpha$ to be zero outside that region, and we need to assume there are no missing pixels for.
+To instead sum over $\mathbb{Z}^2$, we need the original sum in [\ref{eqn:residual-definition}] to truncate outside some finite region by defining both $z_j$ and $\alpha$ to be zero outside that region, and we need to assume there are no missing pixels.
 Neighboring cells will necessarily define truncation inconsistently from each other, so we will also need to build the coadd for a cell with some padding, such that coadd pixels within the cell are (to good approximation) not affected by the truncation, and thus consistent with their neighbors.
 How much padding will depend on the details of the algorithm, and the degree to which we aim for compactness in the real domain vs. compactness in the Fourier domain.
 
@@ -200,7 +200,7 @@ Our final simplifying assumption is naturally that the input images are well-sam
     &= \frac{1}{\sigma_j^2}
         \left|\widetilde{\phi_j}(\symbf{u})\right|^2
         \delta(\symbf{u} + \symbf{v})
-    =
+    \label{eqn:phi-simplified}
 \end{align}
 If we then accumulate the contributions from each input image in the Fourier domain, the delta function factors out of the sum, and we can write
 \begin{align}
@@ -230,7 +230,7 @@ With these in hand, we can compute the Fourier-domain coadd image $z_c$ from the
 Obtaining $\widetilde{\Psi_c}$ from $z_j$ and $\phi_j$ involves a continuous Fourier transform of either noisy, sampled data or something derived from it; a subtly difficult task.
 But it is also possible to reframe this as a linear operation in the image domain:
 \begin{align}
-    z_c(\symbf{r}) &= \sum_j \sum_{\symbf{x}_j} K_j\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right)
+    z_c(\symbf{r}) &= \sum_j \sum_{\symbf{x}_j} K_j\!\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right)
         \, z_j[\symbf{x}_j] \label{eqn:image-domain-coadd} \\
     \widetilde{K}_j(\symbf{u}) &\equiv
         \frac{
@@ -242,7 +242,7 @@ But it is also possible to reframe this as a linear operation in the image domai
 
 This simple result still hides a lot of practical complexity, because $K$ is
 \begin{itemize}
-    \item generally not compact in the image domain;
+    \item generally not compact in the image domain (in fact, it is band-limited, and hence \emph{formally} must have infinite extent in the image domain);
     \item potentially expensive to evaluate at the many non-integer points implied by \ref{eqn:image-domain-coadd}.
 \end{itemize}
 
@@ -264,15 +264,56 @@ In other cases:
 
 Because the coadd likelihood will no longer be exactly equivalent to the original joint single-epoch likelihood with this approximate, we will instead start with [\ref{eqn:image-domain-coadd}] as a prescription for building a coadd, but replace the true (or best-estimate) per-epoch PSFs $\phi_j$ with deliberate approximations $p_j$, and then derive the new effective coadd PSF.
 
-We start by fully expanding $\widetilde{K}$, but leaving the overall normalization (previously just $\sigma_c$) unknown as a parameter $s$:
+We start by expanding $\widetilde{K}$ with that substition:
 \begin{align}
     \widetilde{K}_j(\symbf{u}) &\equiv
         \frac{
-            s \, \widetilde{\phi_j^\ast}(\symbf{u})
+            \sigma_c^2\, \widetilde{p_j^\ast}(\symbf{u})
         }{
-            \sigma_j^2 \, \sqrt{\sum_j \left|\widetilde{\phi_j}(\symbf{u})\right|^2}
+            \sigma_j^2 \, \sqrt{\sum\limits_n \frac{1}{\sigma_n^2}\left|\widetilde{p_n}(\symbf{u})\right|^2}
         }
+    \label{eqn:adjusted-k}
 \end{align}
+Note that $\sigma_c$ is at this stage just an unknown normalization constant; we will show later that it is equal to the noise on the coadd when the effective coadd PSF is normalized.
+
+To compute the effective PSF of the coadd, we coadd the image of a point source centered at $\symbf{r}=0$ using [\ref{eqn:image-domain-coadd}]:
+\begin{align}
+    \phi_c(\symbf{r}) &= \sum_j \sum_{\symbf{x}_j} K_j\!\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right) \, \phi_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j\right)
+\end{align}
+It is important here that we use the true PSFs $\phi_j$ (or our best-available model).
+We are also continuing to rely on our assumption that all input images are well-sampled - without that, $K$ would need to be a position-dependent kernel to have a well-defined PSF on the coadd.
+That assumption also lets us perform this convolution in coadd coordinates\footnote{TODO: prove this by a Fourier round-trip; we get another sum where only $\symbf{k}=0$ survives.}:
+\begin{align}
+    \phi_c(\symbf{r}) &= \sum_j \frac{1}{|A_j|} \sum_{\symbf{s}} K_j\!\left(\symbf{r} - \symbf{s}\right) \, \phi_j\!\left(\symbf{s}\right)
+\end{align}
+We can now solve for $\sigma_c$ by requiring
+\begin{align}
+    \int\! \phi_c(\symbf{r}) \, d^2 \symbf{r} &= 1
+\end{align}
+
+The noise covariance of the coadd can be computed via straightforward uncertainty propagation:
+\begin{align}
+    C_c(\symbf{r}, \symbf{s}) &= \sum_j \sigma_j^2 \sum_{\symbf{x}_j} \,
+        K_j\!\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right) \,
+        K_j\!\left(\symbf{s} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right)
+\end{align}
+Its Fourier transform is
+\begin{align}
+    \widetilde{C_c}(\symbf{u}, \symbf{v}) &= \sum_j \sigma_j^2 \sum_{\symbf{x}_j} \,
+        \widetilde{K_j}(\symbf{u}) \, \widetilde{K_j}(\symbf{v}) \,
+        e^{-2\pi i \symbf{b}_j^T(\symbf{u} + \symbf{v})}
+        \sum_{\symbf{x}_j} \, e^{-2\pi i \symbf{x}_j^{T} \symbf{A}_j^T (\symbf{u} + \symbf{v})} \\
+    &= \sum_j \sigma_j^2 \, \left|\widetilde{K_j}(\symbf{u}) \right|^2 \delta(\symbf{u} + \symbf{v})
+\end{align}
+where the simplification comes from using the Poisson summation formula and rejecting modes other than $\symbf{k}=0$, just as in [\ref{eqn:phi-simplified}].
+Substituting the definition of $\widetilde{K}$ from [\ref{eqn:adjusted-k}], this simplifies further to
+\begin{align}
+    \widetilde{C_c}(\symbf{u}, \symbf{v}) &=
+        \left[\sum_j \frac{\sigma_c^2}{\sigma_j^2} \left|\widetilde{p_j}(\symbf{u})\right|^2\right]
+        \left[\sum_n \frac{1}{\sigma_n^2} \left|\widetilde{p_n}(\symbf{u})\right|^2\right]^{-1}
+        = \sigma_c^2
+\end{align}
+Even with the PSF approximated, the noise in the coadd is uncorrelated and stationary.
 
 
 \section{Implementation options}
@@ -281,7 +322,57 @@ We start by fully expanding $\widetilde{K}$, but leaving the overall normalizati
 
 \subsection{Resampling in advance}
 
-\subsubsection{Native-resolution DFT convolution and deconvolution}
+In this section, we consider implementation options that assume all input images have already been resampled to the coadd grid in advance, presumably via a compact image-domain interpolant that approximates $\sinc$ (e.g. Lanczos).
+This inevitably introduces aliasing, which is traditionally ignored; we will ignore it here as well, but do consider it to be one of the disadvantages of these approaches.
+
+\subsubsection{Native-resolution FFT convolution and deconvolution}
+
+In this approach, input data images $z_j$ are first zero-padded and FFT'd.
+Best-available PSF models $\phi_j$ and approximations $p_j$ are either rendered directly in the Fourier domain or rendered as images and also FFT'd onto the same (discrete) Fourier grid.
+We then accumulate the following sums:
+\begin{align}
+    \widetilde{\Psi_c}[\symbf{u}] &=
+        \sum_j \frac{\widetilde{p_j^*}[\symbf{u}]\,\widetilde{z_j}[\symbf{u}]}{\sigma_j^2} \\
+    \widetilde{\Phi_c^{(1)}}[\symbf{u}] &=
+        \sum_j \frac{\widetilde{p_j^*}[\symbf{u}]\,\widetilde{\phi_j}[\symbf{u}]}{\sigma_j^2} \\
+    \widetilde{\Phi_c^{(2)}}[\symbf{u}] &=
+        \sum_j \frac{\widetilde{p_j^*}[\symbf{u}]\,\widetilde{p_j}[\symbf{u}]}{\sigma_j^2}
+\end{align}
+The unnormalized coadd PSF model $\widetilde{\phi_c}$ is then
+\begin{align}
+    \frac{\widetilde{\phi_c}[\symbf{u}]}{\sigma_c^2} &= \frac{
+        \widetilde{\Phi_c^{(1)}}[\symbf{u}]
+    }{
+        \sqrt{\widetilde{\Phi_c^{(2)}}[\symbf{u}]}
+    } \, ;
+\end{align}
+we can then inverse FFT and solve for $\sigma_c$ via
+\begin{align}
+    \sum_{\symbf{r}} \phi_c[\symbf{r}] &= 1 \, .
+\end{align}
+
+Finally, the Fourier-domain coadd image is
+\begin{align}
+    \widetilde{z_c}[\symbf{u}] &= \frac{
+        \widetilde{\Psi_c}[\symbf{u}] \, \sigma_c^2
+    }{
+        \sqrt{\widetilde{\Phi_c^{(2)}}[\symbf{u}]}
+    } \, ,
+\end{align}
+which we also inverse FFT to form the coadd image.
+
+This approach is in many respects the simplest possible implementation, especially if one already has an optimized pipeline for image resampling.
+It is also probably among the fastest: there are no expensive image-domain convolutions, and the padding necessary for the FFT is \emph{probably} only proportional to the PSF size, not the size of the coadd cell.
+
+The downside of this approach is its nonlocality in the image domain, especially its vulnerability to edge effects.
+If a source lands on the edge of the image we want to FFT, zero-padding will cause a sharp edge that strongly violates the assumption that the image is overall band-limited, yielding aliasing in the FFT.
+Some form of apodization of these edges thus seems to be necessary in practice, such as Gaussian process interpolation (with correlation length set by the PSF) between the image data and the zero-padding region.
+If our convolution operations were compact in the image domain, we could strictly guarantee that these artificial pixels had no effect on the final coadd itself, by including enough \emph{data} padding around the region of interest within the region of apodization.
+But the FFT division by $\sqrt{\widetilde{\Phi_c^{(2)}}[\symbf{u}]}$ in particular combines information from all pixels in the image domain, when computing the value of any other pixel.
+The same kinds of problems can also come up with interpolating missing pixels within the target coadd cell; any problems in those pixels end up affecting (at some level) all pixels.
+
+Attempting the apodization anyway seems like the only way forward; it may be that it works well enough, and the operations are ``local enough'' in the image domain for any systematic errors introduced to be small.
+In any case, this is probably an experimental question; the challenges come from the kids of messy situations that are often hard to simulate, let alone analyze mathematically.
 
 \subsubsection{Analytic single-kernel image-domain convolution}
 
