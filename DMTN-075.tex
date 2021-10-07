@@ -279,12 +279,14 @@ Note that $\sigma_c$ is at this stage just an unknown normalization constant; we
 To compute the effective PSF of the coadd, we coadd the image of a point source centered at $\symbf{r}=0$ using [\ref{eqn:image-domain-coadd}]:
 \begin{align}
     \phi_c(\symbf{r}) &= \sum_j \sum_{\symbf{x}_j} K_j\!\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right) \, \phi_j\!\left(\symbf{A}_j\symbf{x}_j + \symbf{b}_j\right)
+    \label{eqn:psf-propagation-x}
 \end{align}
 It is important here that we use the true PSFs $\phi_j$ (or our best-available model).
 We are also continuing to rely on our assumption that all input images are well-sampled - without that, $K$ would need to be a position-dependent kernel to have a well-defined PSF on the coadd.
 That assumption also lets us perform this convolution in coadd coordinates\footnote{TODO: prove this by a Fourier round-trip; we get another sum where only $\symbf{k}=0$ survives.}:
 \begin{align}
     \phi_c(\symbf{r}) &= \sum_j \frac{1}{|A_j|} \sum_{\symbf{s}} K_j\!\left(\symbf{r} - \symbf{s}\right) \, \phi_j\!\left(\symbf{s}\right)
+    \label{eqn:psf-propagation-r}
 \end{align}
 We can now solve for $\sigma_c$ by requiring
 \begin{align}
@@ -296,10 +298,11 @@ The noise covariance of the coadd can be computed via straightforward uncertaint
     C_c(\symbf{r}, \symbf{s}) &= \sum_j \sigma_j^2 \sum_{\symbf{x}_j} \,
         K_j\!\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right) \,
         K_j\!\left(\symbf{s} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right)
+    \label{eqn:approximate-psf-noise-propagation}
 \end{align}
 Its Fourier transform is
 \begin{align}
-    \widetilde{C_c}(\symbf{u}, \symbf{v}) &= \sum_j \sigma_j^2 \sum_{\symbf{x}_j} \,
+    \widetilde{C_c}(\symbf{u}, \symbf{v}) &= \sum_j \sigma_j^2
         \widetilde{K_j}(\symbf{u}) \, \widetilde{K_j}(\symbf{v}) \,
         e^{-2\pi i \symbf{b}_j^T(\symbf{u} + \symbf{v})}
         \sum_{\symbf{x}_j} \, e^{-2\pi i \symbf{x}_j^{T} \symbf{A}_j^T (\symbf{u} + \symbf{v})} \\
@@ -315,6 +318,32 @@ Substituting the definition of $\widetilde{K}$ from [\ref{eqn:adjusted-k}], this
 \end{align}
 Even with the PSF approximated, the noise in the coadd is uncorrelated and stationary.
 
+With this formalism in hand, we can now look more closely at how this coadd algorithm compares to those in broad use in astronomy.
+A ``direct'' coadd is built by simply resampling all input images to the same grid, and combining them with a weighted mean.
+The weights must be very slowly-varying (often a per-epoch constant), and the combination must use a linear operator (no means or sigma-clipping) for the coadd to have a well-defined effective PSF.
+When the weights are proportional to the exposure time, this approach is statistically equivalent to taking a single longer exposure (at least for the ideal, static sky), but it is not optimal when the input images have different PSFs.
+In fact, we can see here that it is equivalent to using a delta function for all PSF approximations $p_j$ (and kernels $K_j$), or a constant weight in the Fourier domain; the optimal coadd with $p_j \rightarrow \phi_j$ instead gives more weight to high spatial frequency contributions from the best-seeing images.
+
+PSF-matched coadds, in which each input image is degraded to a target PSF that is approximately the same as the PSF of the worst-seeing image, are naturally even worse from a signal-to-noise standpoint.
+This makes sense in our formalism: these define $\widetilde{K_j}$ such that $\widetilde{p_j}$ appears in the denominator, not the numerator, and hence they downweight the high-frequency modes from the better-seeing images even more than the constant Fourier weighting of direct coadds.
+
+\subsection{Full noise propagation}
+
+While the algorithm we have derived assumes stationary, uncorrelated noise, we can still use it coadd images with more complex noise if we are willing to ignore the structure of that noise when determining the weights.
+Just like PSF approximations, this means our coadds will no longer be a sufficient statistic for the static sky, but the loss of information should be quite small in practice.
+
+To fully propagate the noise, we can use the same formula as [\ref{eqn:approximate-psf-noise-propagation}], adjusted to use a full covariance matrix $C_j$ for each input image:
+\begin{align}
+    C_c\!\left[\symbf{r}, \symbf{s}\right] &= \sum_j \sum_{\symbf{x}_j} \, \sum_{\symbf{y}_j} \,
+        K_j\!\left(\symbf{r} - \symbf{A}_j\symbf{x}_j - \symbf{b}_j\right) \,
+        K_j\!\left(\symbf{s} - \symbf{A}_j\symbf{y}_j - \symbf{b}_j\right) \,
+        C_j\!\left[\symbf{x}_j, \symbf{y}_j\right]
+    \label{eqn:general-noise-propagation}
+\end{align}
+Unfortunately, even if the noise is just nonstationary (i.e. still uncorrelated), as is common in astronomical images, the noise on the coadd ends up both nonstationary and correlated, leaving [\ref{eqn:general-noise-propagation}] quite expensive in both compute and storage.
+
+In practice, it will often be sufficient to propagate only the diagonal $C_c\!\left[\symbf{r}, \symbf{r}\right]$ (or even just the original constant approximation $\sigma_c$), and possibly augment this with a few Monte Carlo noise fields: noise images that are coadded in exactly the same way as the true input images.
+Even extremely demanding (in terms of systematic error control) science applications such as shear estimation for weak lensing can often get by with just one Monte Carlo noise realization (TODO citation).
 
 \section{Implementation options}
 
@@ -322,12 +351,16 @@ Even with the PSF approximated, the noise in the coadd is uncorrelated and stati
 
 \subsection{Resampling in advance}
 
+\label{sec:prewarped}
+
 In this section, we consider implementation options that assume all input images have already been resampled to the coadd grid in advance, presumably via a compact image-domain interpolant that approximates $\sinc$ (e.g. Lanczos).
 This inevitably introduces aliasing, which is traditionally ignored; we will ignore it here as well, but do consider it to be one of the disadvantages of these approaches.
 
 \subsubsection{Native-resolution FFT convolution and deconvolution}
 
-In this approach, input data images $z_j$ are first zero-padded and FFT'd.
+\label{sec:prewarped-fft}
+
+In this approach, input data images $z_j$ are FFT'd, which means we must first zero-pad them and apply some sort of multiplicative ramp to a buffer region between the output data region and the zero region, because the presence of sharp edges would cause problems.
 Best-available PSF models $\phi_j$ and approximations $p_j$ are either rendered directly in the Fourier domain or rendered as images and also FFT'd onto the same (discrete) Fourier grid.
 We then accumulate the following sums:
 \begin{align}
@@ -364,17 +397,28 @@ which we also inverse FFT to form the coadd image.
 This approach is in many respects the simplest possible implementation, especially if one already has an optimized pipeline for image resampling.
 It is also probably among the fastest: there are no expensive image-domain convolutions, and the padding necessary for the FFT is \emph{probably} only proportional to the PSF size, not the size of the coadd cell.
 
-The downside of this approach is its nonlocality in the image domain, especially its vulnerability to edge effects.
-If a source lands on the edge of the image we want to FFT, zero-padding will cause a sharp edge that strongly violates the assumption that the image is overall band-limited, yielding aliasing in the FFT.
-Some form of apodization of these edges thus seems to be necessary in practice, such as Gaussian process interpolation (with correlation length set by the PSF) between the image data and the zero-padding region.
-If our convolution operations were compact in the image domain, we could strictly guarantee that these artificial pixels had no effect on the final coadd itself, by including enough \emph{data} padding around the region of interest within the region of apodization.
-But the FFT division by $\sqrt{\widetilde{\Phi_c^{(2)}}[\symbf{u}]}$ in particular combines information from all pixels in the image domain, when computing the value of any other pixel.
-The same kinds of problems can also come up with interpolating missing pixels within the target coadd cell; any problems in those pixels end up affecting (at some level) all pixels.
+The main downside of this approach is its nonlocality in the image domain.
+The FFT division by $\sqrt{\widetilde{\Phi_c^{(2)}}[\symbf{u}]}$ in particular combines information from all pixels when computing the value of any other pixel, so even output pixels far from the cell edge will be affected by our artificial multiplicative ramp to some degree.
+The same is true of bad or missing pixels that are interpolated in the input images; their effect cannot be confined to some region around the interpolation.
 
-Attempting the apodization anyway seems like the only way forward; it may be that it works well enough, and the operations are ``local enough'' in the image domain for any systematic errors introduced to be small.
-In any case, this is probably an experimental question; the challenges come from the kids of messy situations that are often hard to simulate, let alone analyze mathematically.
+It may be that this is not a serious problem in practice; the operations may be ``local enough'' in the image domain for any systematic errors introduced to be negligible.
+But this is largely an experimental question, and it certainly depends on the profiles of the input PSFs and their approximations; the challenges come from the kids of messy situations that are often hard to simulate, let alone analyze mathematically.
 
-\subsubsection{Analytic single-kernel image-domain convolution}
+Because this method never actually constructs the weighting operators $K_j$ directly, there is no direct way to propagate a full noise covariance matrix with it via [\ref{eqn:general-noise-propagation}]; if that kind of noise propagation is desired one would instead have to construct a compact $K_j$ using a different approach (e.g. Section~\ref{sec:prewarped-image-domain}) that is not quite the same as the one effectively used here.
+The same is true of the extensions in Section~\ref{sec:extensions} that make use of an image-domain $K_j$.
+
+\subsubsection{Single-kernel image-domain convolution}
+
+\label{sec:prewarped-image-domain}
+
+This method is in many respects the opposite of the previous one, though it also assumes the input data has been resampled.
+We work entirely in the image domain; we compute approximations to $K_j$ and then use [\ref{eqn:image-domain-coadd}] and [\ref{eqn:psf-propagation-r}] to directly accumulate the coadd image and effective PSF.
+
+In order to make these discrete convolution operations efficient, we need to define $K_j$ approximations with strictly finite support in the image domain (even if it is derived from an analytic form that does not truncate, we need to render images from it that do).
+This directly addresses the locality problems with FFT methods, like the one described in Section~\ref{sec:prewarped-fft}; zero-padding and artificial ramps are unnecessary.
+We do need to expand the region we convolve by a buffer the size of $K_j$, but after doing so we can be confident that the original target region is fully unaffected by artifacts or missing pixels beyond that padding.
+
+The challenge with this approach is in constructing the $K_j$ approximations; finite support in the image domain makes it impossible to formally also make $K_j$ band-limited, but we need to keep aliasing due to high-frequency power in $K_j$ to a minimum.
 
 \subsection{Combining resampling and weights}
 
@@ -383,6 +427,8 @@ In any case, this is probably an experimental question; the challenges come from
 \subsubsection{Analytic single-kernel image-domain resampling and weights}
 
 \section{Extensions for relaxed assumptions}
+
+\label{sec:extensions}
 
 \subsection{Nonstationary noise}
 
